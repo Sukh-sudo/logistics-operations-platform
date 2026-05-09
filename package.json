@@ -1,0 +1,21 @@
+{
+  "name": "logistics-operations-platform",
+  "private": true,
+  "packageManager": "npm@11.5.1",
+  "description": "Event-driven transport operations intelligence platform",
+  "workspaces": [
+    "backend/*",
+    "frontend/*",
+    "mobile/*",
+    "shared/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "^2.9.12"
+  }
+}
