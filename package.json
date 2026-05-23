@@ -1,21 +1,23 @@
 {
   "name": "logistics-operations-platform",
-  "private": true,
-  "packageManager": "npm@11.5.1",
-  "description": "Event-driven transport operations intelligence platform",
-  "workspaces": [
-    "backend/*",
-    "frontend/*",
-    "mobile/*",
-    "shared/*"
-  ],
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.2.2",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
   "devDependencies": {
-    "turbo": "^2.9.12"
+    "turbo": "^2.9.14"
   }
 }
