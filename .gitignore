@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # compiled output
 /dist
 /node_modules
@@ -54,3 +55,10 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+=======
+node_modules
+.turbo
+dist
+coverage
+.env
+>>>>>>> 0d1b1f9365e193d445337a34e510cd5ca3c58d6f
