@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PackageStatus {
+  CREATED
+  RECEIVED
+  IN_TRANSIT
+  DELIVERED
+}
+
+enum PackageEventType {
+  PACKAGE_CREATED
+  PACKAGE_RECEIVED
+  PACKAGE_IN_TRANSIT
+  PACKAGE_DELIVERED
+}
+
+model PackageSnapshot {
+  id                 String         @id @default(cuid())
+  trackingNumber     String         @unique
+  currentStatus      PackageStatus
+  currentTerminalId  Int?
+  updatedAt          DateTime       @updatedAt
+
+  events             PackageEvent[]
+}
+
+model PackageEvent {
+  id              String            @id @default(cuid())
+  packageId       String
+  eventType       PackageEventType
+  terminalId      Int?
+  employeeId      Int?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+
+  package         PackageSnapshot   @relation(fields: [packageId], references: [id])
+}
