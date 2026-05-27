@@ -1,0 +1,22 @@
+{
+  "extends": "../tsconfig.json",
+
+  "compilerOptions": {
+    // Explicit root directory for tests
+    "rootDir": "../",
+
+    // Silence TS6 deprecation warnings
+    "ignoreDeprecations": "6.0",
+
+    // Required for Jest transpilation
+    "module": "commonjs",
+
+    // Allow Jest globals/types
+    "types": ["jest", "node"]
+  },
+
+  "include": [
+    "../src/**/*",
+    "./**/*"
+  ]
+}
