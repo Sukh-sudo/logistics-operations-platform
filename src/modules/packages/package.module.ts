@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 
 import { PackageEventsController } from './controllers/package-events.controller';
 import { PackageService } from './services/package.service';
+import { PackageTransitionValidator } from './validators/package-transition.validator';
+
 
 @Module({
   controllers: [PackageEventsController],
-  providers: [PackageService],
+  providers: [PackageService, PackageTransitionValidator,],
 })
 export class PackageModule {}

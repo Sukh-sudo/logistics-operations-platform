@@ -9,6 +9,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { KafkaService } from '../../../infrastructure/kafka/kafka.service';
 import { CreatePackageEventDto } from '../dto/create-package-event.dto';
 import { AppLogger } from '../../../common/utils/logger';
+import { PackageTransitionValidator } from '../validators/package-transition.validator';
 
 @Injectable()
 export class PackageService {
@@ -18,6 +19,9 @@ export class PackageService {
 
   // Inject Kafka publishing service
   private readonly kafkaService: KafkaService,
+
+   // Operational transition validator
+  private readonly transitionValidator: PackageTransitionValidator,
 ) {}
 
   async createPackageEvent(dto: CreatePackageEventDto) {
@@ -38,17 +42,26 @@ export class PackageService {
 
     // Create snapshot if package does not exist yet
     if (!snapshot) {
-        // Log snapshot creation
-        AppLogger.log(
-        `Creating snapshot for ${dto.trackingNumber}`,
-        );
-      snapshot = await tx.packageSnapshot.create({
-        data: {
-          trackingNumber: dto.trackingNumber,
-          currentStatus: PackageStatus.CREATED,
-        },
-      });
+
+   // Create initial package snapshot
+    snapshot = await tx.packageSnapshot.create({
+    data: {
+      trackingNumber: dto.trackingNumber,
+      currentStatus: PackageStatus.CREATED,
+    },
+   });
+
+  // Log snapshot creation
+    AppLogger.log(
+    `Created snapshot for ${dto.trackingNumber}`,
+    );
     }
+
+    // Validate operational state transition
+    this.transitionValidator.validateTransition(
+    snapshot.currentStatus,
+    dto.eventType,
+    );
 
     // Append immutable package event
     const event = await tx.packageEvent.create({

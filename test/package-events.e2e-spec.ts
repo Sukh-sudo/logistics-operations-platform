@@ -31,13 +31,16 @@ describe('Package Events (e2e)', () => {
   });
 
   afterAll(async () => {
-    // Shutdown app cleanly after tests
+
+  // Only close app if app initialized successfully
+  if (app) {
     await app.close();
+  }
   });
 
   it('should create package event successfully', async () => {
     const payload = {
-      trackingNumber: 'PKG-TEST-001',
+      trackingNumber: `PKG-TEST-${Date.now()}`,
       eventType: 'PACKAGE_RECEIVED',
       terminalId: 1,
       employeeId: 55,
@@ -70,5 +73,39 @@ describe('Package Events (e2e)', () => {
       .post('/package-events')
       .send(invalidPayload)
       .expect(400);
+  });
+
+  it('should reject invalid lifecycle transition', async () => {
+
+  // First move package to DELIVERED state
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber: 'PKG-INVALID-001',
+      eventType: 'PACKAGE_RECEIVED',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber: 'PKG-INVALID-001',
+      eventType: 'PACKAGE_IN_TRANSIT',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber: 'PKG-INVALID-001',
+      eventType: 'PACKAGE_DELIVERED',
+    });
+
+  // Attempt invalid reverse transition
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber: 'PKG-INVALID-001',
+      eventType: 'PACKAGE_IN_TRANSIT',
+    })
+    .expect(400);
   });
 });
