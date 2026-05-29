@@ -1,47 +1,57 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import {BadRequestException, Injectable,} from '@nestjs/common';
+import {PackageEventType,PackageStatus,} from '@prisma/client';
 
-import {
-  PackageEventType,
-  PackageStatus,
-} from '@prisma/client';
-
-// Handles operational lifecycle transition validation
 @Injectable()
 export class PackageTransitionValidator {
-
-  // Validate whether a status transition is allowed
   validateTransition(
     currentStatus: PackageStatus,
     nextEvent: PackageEventType,
   ) {
 
-    // Allowed operational transitions
     const validTransitions: Record<
       PackageStatus,
       PackageEventType[]
     > = {
-      CREATED: [
-        PackageEventType.PACKAGE_RECEIVED,
-      ],
 
       RECEIVED: [
-        PackageEventType.PACKAGE_IN_TRANSIT,
+        PackageEventType.PACKAGE_SORTED,
       ],
 
-      IN_TRANSIT: [
+      SORTED: [
+        PackageEventType.PACKAGE_LOADED_TO_CONTAINER,
+        PackageEventType.PACKAGE_LOADED_TO_TRAILER,
+      ],
+
+      IN_CONTAINER: [
+        PackageEventType.PACKAGE_UNLOADED_FROM_CONTAINER,
+        PackageEventType.PACKAGE_LOADED_TO_TRAILER,
+      ],
+
+      IN_TRAILER: [
+        PackageEventType.PACKAGE_DEPARTED,
+        PackageEventType.PACKAGE_UNLOADED_FROM_TRAILER,
+      ],
+
+      DEPARTED: [
+        PackageEventType.PACKAGE_ARRIVED,
+      ],
+
+      ARRIVED: [
+        PackageEventType.PACKAGE_OUT_FOR_DELIVERY,
+        PackageEventType.PACKAGE_SORTED,
+      ],
+
+      OUT_FOR_DELIVERY: [
         PackageEventType.PACKAGE_DELIVERED,
       ],
 
       DELIVERED: [],
     };
 
-    // Reject invalid lifecycle transitions
-    if (
-      !validTransitions[currentStatus]?.includes(nextEvent)
-    ) {
+    const allowedEvents =
+      validTransitions[currentStatus] ?? [];
+
+    if (!allowedEvents.includes(nextEvent)) {
       throw new BadRequestException(
         `Invalid transition from ${currentStatus} using ${nextEvent}`,
       );

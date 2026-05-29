@@ -13,6 +13,9 @@ import { HealthModule } from './modules/health/health.module';
 
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
+import { ContainerModule } from './modules/containers/container.module';
+
+
 @Module({
   imports: [
     // Register global Prisma access
@@ -25,6 +28,8 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     PackageModule,
 
     HealthModule,
+
+    ContainerModule,
   ],
 })
 export class AppModule implements NestModule {

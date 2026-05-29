@@ -1,16 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import {
-  PackageEventType,
-  PackageStatus,
-} from '@prisma/client';
-
+import {PackageEventType,PackageStatus,} from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 // Kafka publishing service
 import { KafkaService } from '../../../infrastructure/kafka/kafka.service';
 import { CreatePackageEventDto } from '../dto/create-package-event.dto';
 import { AppLogger } from '../../../common/utils/logger';
 import { PackageTransitionValidator } from '../validators/package-transition.validator';
-import { KAFKA_TOPICS } from '../../../../packages/shared-constants/kafka-topics';
 
 @Injectable()
 export class PackageService {
@@ -41,31 +37,41 @@ export class PackageService {
       },
     });
 
+        // Skip validation on first scan
+     if (snapshot) {
+      console.log('Current Status:',snapshot.currentStatus,'Next Event:',dto.eventType,);
+      this.transitionValidator.validateTransition(
+      snapshot.currentStatus,
+      dto.eventType,
+      );
+     }
     // Create snapshot if package does not exist yet
     if (!snapshot) {
 
-   // Create initial package snapshot
-    snapshot = await tx.packageSnapshot.create({
-    data: {
-      trackingNumber: dto.trackingNumber,
-      currentStatus: PackageStatus.CREATED,
-    },
-   });
+      // First event must always be PACKAGE_RECEIVED
+      if (dto.eventType !== PackageEventType.PACKAGE_RECEIVED) {
+        throw new BadRequestException(
+          'First package event must be PACKAGE_RECEIVED',
+        );
+      }
 
-  // Log snapshot creation
-    AppLogger.log(
-    `Created snapshot for ${dto.trackingNumber}`,
-    );
-    }
+      snapshot = await tx.packageSnapshot.create({
+        data: {
+          trackingNumber: dto.trackingNumber,
+          currentStatus: PackageStatus.RECEIVED,
+        },
+      });
 
-    // Validate operational state transition
-    this.transitionValidator.validateTransition(
-    snapshot.currentStatus,
-    dto.eventType,
-    );
+        // Log snapshot creation
+        AppLogger.log(
+          `Created snapshot for ${dto.trackingNumber}`,
+        );
+      }
+
+
 
     // Append immutable package event
-    const event = await tx.packageEvent.create({
+  const event = await tx.packageEvent.create({
       data: {
         packageId: snapshot.id,
         eventType: dto.eventType,
@@ -76,10 +82,25 @@ export class PackageService {
 
     // Map event type to operational package status
     const statusMap: Record<PackageEventType, PackageStatus> = {
-      PACKAGE_CREATED: PackageStatus.CREATED,
-      PACKAGE_RECEIVED: PackageStatus.RECEIVED,
-      PACKAGE_IN_TRANSIT: PackageStatus.IN_TRANSIT,
-      PACKAGE_DELIVERED: PackageStatus.DELIVERED,
+      PACKAGE_RECEIVED:PackageStatus.RECEIVED,
+
+      PACKAGE_SORTED: PackageStatus.SORTED,
+
+      PACKAGE_LOADED_TO_CONTAINER:PackageStatus.IN_CONTAINER,
+
+      PACKAGE_UNLOADED_FROM_CONTAINER:PackageStatus.SORTED,
+
+      PACKAGE_LOADED_TO_TRAILER:PackageStatus.IN_TRAILER,
+
+      PACKAGE_UNLOADED_FROM_TRAILER:PackageStatus.ARRIVED,
+
+      PACKAGE_DEPARTED:PackageStatus.DEPARTED,
+
+      PACKAGE_ARRIVED:PackageStatus.ARRIVED,
+
+      PACKAGE_OUT_FOR_DELIVERY:PackageStatus.OUT_FOR_DELIVERY,
+
+      PACKAGE_DELIVERED:PackageStatus.DELIVERED,
     };
 
     // Update current operational snapshot
@@ -105,7 +126,7 @@ export class PackageService {
     );
 
   // Publish Kafka event AFTER successful transaction commit
-  await this.kafkaService.publish(KAFKA_TOPICS.PACKAGE_EVENTS, {
+  await this.kafkaService.publish('package-events', {
     requestId,
     trackingNumber: dto.trackingNumber,
     eventType: dto.eventType,
@@ -118,3 +139,4 @@ export class PackageService {
   return result;
 }
 }
+

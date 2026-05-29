@@ -109,60 +109,6 @@ describe('Package Events (e2e)', () => {
     .expect(400);
   });
 
-  it('should process full package lifecycle correctly', async () => {
-
-  // Create unique tracking number for isolated test run
-  const trackingNumber = `PKG-LIFECYCLE-${Date.now()}`;
-
-  // Step 1 → PACKAGE_RECEIVED
-  const receivedResponse = await request(app.getHttpServer())
-    .post('/package-events')
-    .send({
-      trackingNumber,
-      eventType: 'PACKAGE_RECEIVED',
-      terminalId: 1,
-      employeeId: 101,
-    })
-    .expect(201);
-
-  // Verify package moved to RECEIVED
-  expect(
-    receivedResponse.body.snapshot.currentStatus,
-  ).toBe('RECEIVED');
-
-  // Step 2 → PACKAGE_IN_TRANSIT
-  const transitResponse = await request(app.getHttpServer())
-    .post('/package-events')
-    .send({
-      trackingNumber,
-      eventType: 'PACKAGE_IN_TRANSIT',
-      terminalId: 2,
-      employeeId: 102,
-    })
-    .expect(201);
-
-  // Verify package moved to IN_TRANSIT
-  expect(
-    transitResponse.body.snapshot.currentStatus,
-  ).toBe('IN_TRANSIT');
-
-  // Step 3 → PACKAGE_DELIVERED
-  const deliveredResponse = await request(app.getHttpServer())
-    .post('/package-events')
-    .send({
-      trackingNumber,
-      eventType: 'PACKAGE_DELIVERED',
-      terminalId: 3,
-      employeeId: 103,
-    })
-    .expect(201);
-
-  // Verify package moved to DELIVERED
-  expect(
-    deliveredResponse.body.snapshot.currentStatus,
-  ).toBe('DELIVERED');
-  });
-
   it('should reject invalid CREATED → DELIVERED transition', async () => {
 
   const trackingNumber = `PKG-INVALID-${Date.now()}`;
@@ -211,5 +157,195 @@ describe('Package Events (e2e)', () => {
     })
     .expect(400);
   });
+
+  it('should process full package lifecycle correctly', async () => {
+
+  const trackingNumber =
+    `PKG-LIFECYCLE-${Date.now()}`;
+
+  // RECEIVED
+  let response = await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_RECEIVED',
+      terminalId: 1,
+      employeeId: 101,
+    })
+    .expect(201);
+
+  expect(
+    response.body.snapshot.currentStatus,
+  ).toBe('RECEIVED');
+
+  // SORTED
+  response = await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_SORTED',
+      terminalId: 1,
+      employeeId: 101,
+    })
+    .expect(201);
+
+  expect(
+    response.body.snapshot.currentStatus,
+  ).toBe('SORTED');
+
+  // IN_CONTAINER
+  response = await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_LOADED_TO_CONTAINER',
+      terminalId: 1,
+      employeeId: 101,
+    })
+    .expect(201);
+
+  expect(
+    response.body.snapshot.currentStatus,
+  ).toBe('IN_CONTAINER');
+
+  // IN_TRAILER
+  response = await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_LOADED_TO_TRAILER',
+      terminalId: 1,
+      employeeId: 101,
+    })
+    .expect(201);
+
+  expect(
+    response.body.snapshot.currentStatus,
+  ).toBe('IN_TRAILER');
+
+  // DEPARTED
+  response = await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_DEPARTED',
+      terminalId: 1,
+      employeeId: 101,
+    })
+    .expect(201);
+
+  expect(
+    response.body.snapshot.currentStatus,
+  ).toBe('DEPARTED');
+
+  // ARRIVED
+  response = await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_ARRIVED',
+      terminalId: 2,
+      employeeId: 102,
+    })
+    .expect(201);
+
+  expect(
+    response.body.snapshot.currentStatus,
+  ).toBe('ARRIVED');
+
+  // OUT FOR DELIVERY
+  response = await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_OUT_FOR_DELIVERY',
+      terminalId: 2,
+      employeeId: 102,
+    })
+    .expect(201);
+
+  expect(
+    response.body.snapshot.currentStatus,
+  ).toBe('OUT_FOR_DELIVERY');
+
+  // DELIVERED
+  response = await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_DELIVERED',
+      terminalId: 2,
+      employeeId: 102,
+    })
+    .expect(201);
+
+  expect(
+    response.body.snapshot.currentStatus,
+  ).toBe('DELIVERED');
+});
+
+it('should reject DELIVERED back to IN_TRAILER transition', async () => {
+
+  const trackingNumber =
+    `PKG-REVERSE-${Date.now()}`;
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_RECEIVED',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_SORTED',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_LOADED_TO_TRAILER',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_DEPARTED',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_ARRIVED',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_OUT_FOR_DELIVERY',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_DELIVERED',
+    });
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_LOADED_TO_TRAILER',
+    })
+    .expect(400);
+});
+
 
 });
