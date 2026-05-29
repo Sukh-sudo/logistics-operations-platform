@@ -8,9 +8,11 @@ export class HealthController {
 
     // Basic application health response
     return {
-      status: 'ok',
-      service: 'logistics-platform',
-      timestamp: new Date(),
+    "status": "ok",
+    "database": "connected",
+    "kafka": "unavailable",
+    "uptime": 4521,
+    "timestamp": "..."
     };
   }
 }

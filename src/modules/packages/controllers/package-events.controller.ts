@@ -2,19 +2,28 @@ import { Body, Controller, Post } from '@nestjs/common';
 import { CreatePackageEventDto } from '../dto/create-package-event.dto';
 import { PackageService } from '../services/package.service';
 import { AppLogger } from '../../../common/utils/logger';
+import { Req } from '@nestjs/common';
+import type {RequestWithId,} from '../../../common/middleware/request-id.middleware';
 
 @Controller('package-events')
 export class PackageEventsController {
   constructor(private readonly packageService: PackageService) {}
 
   @Post()
-async createEvent(@Body() dto: CreatePackageEventDto) {
+  async createEvent(
+    @Body() dto: CreatePackageEventDto,
 
-  // Log incoming operational request
-  AppLogger.log(
-    `Received package event request for ${dto.trackingNumber}`,
-  );
+    @Req() req: RequestWithId,
+  ) {
 
-  return this.packageService.createPackageEvent(dto);
-}
+    // Log incoming request with correlation ID
+    AppLogger.log(
+      `[${req.requestId}] Received package event request for ${dto.trackingNumber}`,
+    );
+
+    return this.packageService.createPackageEvent(
+      dto,
+      req.requestId,
+    );
+  }
 }

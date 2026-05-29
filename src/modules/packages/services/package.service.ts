@@ -10,6 +10,7 @@ import { KafkaService } from '../../../infrastructure/kafka/kafka.service';
 import { CreatePackageEventDto } from '../dto/create-package-event.dto';
 import { AppLogger } from '../../../common/utils/logger';
 import { PackageTransitionValidator } from '../validators/package-transition.validator';
+import { KAFKA_TOPICS } from '../../../../packages/shared-constants/kafka-topics';
 
 @Injectable()
 export class PackageService {
@@ -24,11 +25,11 @@ export class PackageService {
   private readonly transitionValidator: PackageTransitionValidator,
 ) {}
 
-  async createPackageEvent(dto: CreatePackageEventDto) {
+  async createPackageEvent(dto: CreatePackageEventDto, requestId?: string,) {
 
     // Log workflow start
     AppLogger.log(
-   `Processing package event: ${dto.eventType}`,
+  `[${requestId}] Processing package event: ${dto.eventType}`,
     );
   // Execute DB operations inside transaction
   const result = await this.prisma.$transaction(async (tx) => {
@@ -100,17 +101,19 @@ export class PackageService {
 
   // Log Kafka publication attempt
     AppLogger.log(
-    `Publishing package event to Kafka`,
+    `[${requestId}] Publishing package event to Kafka`,
     );
 
   // Publish Kafka event AFTER successful transaction commit
-  await this.kafkaService.publish('package-events', {
+  await this.kafkaService.publish(KAFKA_TOPICS.PACKAGE_EVENTS, {
+    requestId,
     trackingNumber: dto.trackingNumber,
     eventType: dto.eventType,
     terminalId: dto.terminalId,
     employeeId: dto.employeeId,
     createdAt: new Date(),
-  });
+    },
+  );
 
   return result;
 }

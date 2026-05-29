@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, } from '@nestjs/common';
 
 // Database infrastructure module
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
@@ -10,6 +10,8 @@ import { KafkaModule } from './infrastructure/kafka/kafka.module';
 import { PackageModule } from './modules/packages/package.module';
 
 import { HealthModule } from './modules/health/health.module';
+
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
   imports: [
@@ -25,4 +27,11 @@ import { HealthModule } from './modules/health/health.module';
     HealthModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+
+  configure(consumer: MiddlewareConsumer) {
+
+    // Attach request IDs to all incoming requests
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}
