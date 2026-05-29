@@ -1,6 +1,8 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ContainerService } from '../services/container.service';
+import {Body,Controller,Param,Post,} from '@nestjs/common';
+
 import { CreateContainerDto } from '../dto/create-container.dto';
+import { LoadPackageDto } from '../dto/load-package.dto';
+import { ContainerService } from '../services/container.service';
 
 @Controller('containers')
 export class ContainerController {
@@ -13,5 +15,16 @@ export class ContainerController {
     @Body() dto: CreateContainerDto,
   ) {
     return this.containerService.createContainer(dto);
+  }
+
+  @Post(':containerId/load-package')
+  loadPackage(
+    @Param('containerId') containerId: string,
+    @Body() dto: LoadPackageDto,
+  ) {
+    return this.containerService.loadPackage(
+      containerId,
+      dto,
+    );
   }
 }

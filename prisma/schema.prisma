@@ -7,16 +7,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model PackageSnapshot {
+  id                 String         @id @default(cuid())
+  trackingNumber     String         @unique
+  currentStatus      PackageStatus
+  currentTerminalId  Int?
+  updatedAt          DateTime       @updatedAt
+  currentContainerId String?
+  currentTrailerId   String?
+  events             PackageEvent[]
+}
+
+model PackageEvent {
+  id         String           @id @default(cuid())
+  packageId  String
+  eventType  PackageEventType
+  terminalId Int?
+  employeeId Int?
+  metadata   Json?
+  createdAt  DateTime         @default(now())
+  package    PackageSnapshot  @relation(fields: [packageId], references: [id])
+}
+
+model ContainerSnapshot {
+  id               String           @id @default(cuid())
+  containerBarcode String           @unique
+  currentStatus    ContainerStatus
+  currentTrailerId String?
+  packageCount     Int              @default(0)
+  updatedAt        DateTime         @updatedAt
+  events           ContainerEvent[]
+}
+
+model ContainerEvent {
+  id          String             @id @default(cuid())
+  containerId String
+  eventType   ContainerEventType
+  employeeId  Int?
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+  container   ContainerSnapshot  @relation(fields: [containerId], references: [id])
+}
+
+model PackageContainerHistory {
+  id          String    @id @default(cuid())
+  packageId   String
+  containerId String
+  loadedAt    DateTime  @default(now())
+  unloadedAt  DateTime?
+}
+
 enum PackageStatus {
   RECEIVED
   SORTED
-
   IN_CONTAINER
   IN_TRAILER
-
   DEPARTED
   ARRIVED
-
   OUT_FOR_DELIVERY
   DELIVERED
 }
@@ -24,16 +71,12 @@ enum PackageStatus {
 enum PackageEventType {
   PACKAGE_RECEIVED
   PACKAGE_SORTED
-
   PACKAGE_LOADED_TO_CONTAINER
   PACKAGE_UNLOADED_FROM_CONTAINER
-
   PACKAGE_LOADED_TO_TRAILER
   PACKAGE_UNLOADED_FROM_TRAILER
-
   PACKAGE_DEPARTED
   PACKAGE_ARRIVED
-
   PACKAGE_OUT_FOR_DELIVERY
   PACKAGE_DELIVERED
 }
@@ -50,80 +93,4 @@ enum ContainerEventType {
   CONTAINER_CLOSED
   CONTAINER_DEPARTED
   CONTAINER_ARRIVED
-}
-
-model PackageSnapshot {
-  id                 String         @id @default(cuid())
-
-  trackingNumber     String         @unique
-
-  currentStatus      PackageStatus
-
-  currentTerminalId  Int?
-
-  // Future container membership
-  currentContainerId String?
-
-  // Future trailer membership
-  currentTrailerId   String?
-
-  updatedAt          DateTime       @updatedAt
-
-  events             PackageEvent[]
-}
-
-model PackageEvent {
-  id              String            @id @default(cuid())
-  packageId       String
-  eventType       PackageEventType
-  terminalId      Int?
-  employeeId      Int?
-  metadata        Json?
-  createdAt       DateTime          @default(now())
-
-  package         PackageSnapshot   @relation(fields: [packageId], references: [id])
-}
-
-model ContainerSnapshot {
-  id               String   @id @default(cuid())
-
-  containerBarcode String   @unique
-
-  currentStatus    ContainerStatus
-
-  currentTrailerId String?
-
-  packageCount     Int      @default(0)
-
-  updatedAt        DateTime @updatedAt
-
-  events           ContainerEvent[]
-}
-
-model ContainerEvent {
-  id          String             @id @default(cuid())
-
-  containerId String
-
-  eventType   ContainerEventType
-
-  employeeId  Int?
-
-  metadata    Json?
-
-  createdAt   DateTime @default(now())
-
-  container   ContainerSnapshot @relation(fields: [containerId], references: [id])
-}
-
-model PackageContainerHistory {
-  id           String   @id @default(cuid())
-
-  packageId    String
-
-  containerId  String
-
-  loadedAt     DateTime @default(now())
-
-  unloadedAt   DateTime?
 }
