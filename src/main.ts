@@ -1,7 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import {
-  ValidationPipe,
-} from '@nestjs/common';
+import {ValidationPipe,} from '@nestjs/common';
 
 // Swagger imports
 import {
@@ -25,6 +23,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
 
   // Register global Prisma exception handling
   app.useGlobalFilters(

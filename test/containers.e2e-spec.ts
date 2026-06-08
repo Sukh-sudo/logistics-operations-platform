@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  INestApplication,
-  ValidationPipe,
-} from '@nestjs/common';
-
+import {INestApplication,ValidationPipe,} from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+
+const prisma = new PrismaClient();
 
 describe('Containers (e2e)', () => {
   let app: INestApplication;
@@ -31,10 +30,12 @@ describe('Containers (e2e)', () => {
   });
 
   afterAll(async () => {
-    if (app) {
-      await app.close();
-    }
-  });
+  if (app) {
+    await app.close();
+  }
+
+  await prisma.$disconnect();
+});
 
   it('should create container successfully', async () => {
     const barcode = `CONT-${Date.now()}`;
@@ -211,6 +212,171 @@ it('should load package into container', async () => {
 
   expect(response.body.success)
     .toBe(true);
+});
+
+it('should unload package from container', async () => {
+
+  const trackingNumber =
+    `PKG-UNLOAD-${Date.now()}`;
+
+  // Create package
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_RECEIVED',
+    })
+    .expect(201);
+
+  // Create container
+  const containerResponse =
+    await request(app.getHttpServer())
+      .post('/containers')
+      .send({
+        containerBarcode:
+          `CONT-UNLOAD-${Date.now()}`,
+      })
+      .expect(201);
+
+  const containerId =
+    containerResponse.body.snapshot.id;
+
+  // Load package
+  await request(app.getHttpServer())
+    .post(
+      `/containers/${containerId}/load-package`,
+    )
+    .send({
+      trackingNumber,
+    })
+    .expect(201);
+
+  // Unload package
+  const response =
+    await request(app.getHttpServer())
+      .post(
+        `/containers/${containerId}/unload-package`,
+      )
+      .send({
+        trackingNumber,
+      })
+      .expect(201);
+
+  expect(response.body.success)
+    .toBe(true);
+});
+
+it('should create PACKAGE_LOADED_TO_CONTAINER event', async () => {
+
+  const trackingNumber =
+    `PKG-EVENT-${Date.now()}`;
+
+  // Create package
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_RECEIVED',
+    })
+    .expect(201);
+
+  // Create container
+  const containerResponse =
+    await request(app.getHttpServer())
+      .post('/containers')
+      .send({
+        containerBarcode:
+          `CONT-EVENT-${Date.now()}`,
+      })
+      .expect(201);
+
+  const containerId =
+    containerResponse.body.snapshot.id;
+
+  // Load package
+  await request(app.getHttpServer())
+    .post(
+      `/containers/${containerId}/load-package`,
+    )
+    .send({
+      trackingNumber,
+    })
+    .expect(201);
+
+  // Verify event exists
+  const packageRecord =
+    await prisma.packageSnapshot.findUnique({
+      where: { trackingNumber },
+      include: { events: true },
+    });
+
+  expect(
+    packageRecord?.events.some(
+      (e) =>
+        e.eventType ===
+        'PACKAGE_LOADED_TO_CONTAINER',
+    ),
+  ).toBe(true);
+});
+
+it('should create PACKAGE_UNLOADED_FROM_CONTAINER event', async () => {
+
+  const trackingNumber =
+    `PKG-UNLOAD-EVENT-${Date.now()}`;
+
+  // Create package
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber,
+      eventType: 'PACKAGE_RECEIVED',
+    });
+
+  // Create container
+  const containerResponse =
+    await request(app.getHttpServer())
+      .post('/containers')
+      .send({
+        containerBarcode:
+          `CONT-UNLOAD-EVENT-${Date.now()}`,
+      });
+
+  const containerId =
+    containerResponse.body.snapshot.id;
+
+  // Load package
+  await request(app.getHttpServer())
+    .post(
+      `/containers/${containerId}/load-package`,
+    )
+    .send({
+      trackingNumber,
+    });
+
+  // Unload package
+  await request(app.getHttpServer())
+    .post(
+      `/containers/${containerId}/unload-package`,
+    )
+    .send({
+      trackingNumber,
+    })
+    .expect(201);
+
+  // Verify event exists
+  const packageRecord =
+    await prisma.packageSnapshot.findUnique({
+      where: { trackingNumber },
+      include: { events: true },
+    });
+
+  expect(
+    packageRecord?.events.some(
+      (e) =>
+        e.eventType ===
+        'PACKAGE_UNLOADED_FROM_CONTAINER',
+    ),
+  ).toBe(true);
 });
 
 });

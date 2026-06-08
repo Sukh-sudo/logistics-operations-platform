@@ -27,4 +27,15 @@ export class ContainerController {
       dto,
     );
   }
+
+  @Post(':containerId/unload-package')
+unloadPackage(
+  @Param('containerId') containerId: string,
+  @Body() dto: LoadPackageDto,
+) {
+  return this.containerService.unloadPackage(
+    containerId,
+    dto,
+  );
+}
 }

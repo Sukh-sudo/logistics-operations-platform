@@ -15,6 +15,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 import { ContainerModule } from './modules/containers/container.module';
 
+import { TrailerModule } from './modules/trailers/trailer.module';
 
 @Module({
   imports: [
@@ -30,6 +31,8 @@ import { ContainerModule } from './modules/containers/container.module';
     HealthModule,
 
     ContainerModule,
+
+    TrailerModule,
   ],
 })
 export class AppModule implements NestModule {

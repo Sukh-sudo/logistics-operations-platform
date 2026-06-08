@@ -18,6 +18,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
 
     // Handle unique constraint violations
     if (exception.code === 'P2002') {
+      
       return response.status(HttpStatus.CONFLICT).json({
         message: 'Duplicate record detected',
         prismaCode: exception.code,

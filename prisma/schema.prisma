@@ -57,6 +57,53 @@ model PackageContainerHistory {
   unloadedAt  DateTime?
 }
 
+model TrailerSnapshot {
+  id               String   @id @default(cuid())
+
+  trailerBarcode   String   @unique
+
+  currentStatus    TrailerStatus
+
+  containerCount   Int      @default(0)
+  packageCount     Int      @default(0)
+
+  updatedAt        DateTime @updatedAt
+
+  events           TrailerEvent[]
+}
+
+model TrailerEvent {
+  id          String @id @default(cuid())
+
+  trailerId   String
+
+  eventType   TrailerEventType
+
+  createdAt   DateTime @default(now())
+
+  trailer     TrailerSnapshot @relation(fields: [trailerId], references: [id])
+}
+
+model ContainerTrailerHistory {
+  id            String   @id @default(cuid())
+
+  containerId   String
+  trailerId     String
+
+  loadedAt      DateTime @default(now())
+  unloadedAt    DateTime?
+}
+
+model PackageTrailerHistory {
+  id            String   @id @default(cuid())
+
+  packageId     String
+  trailerId     String
+
+  loadedAt      DateTime @default(now())
+  unloadedAt    DateTime?
+}
+
 enum PackageStatus {
   RECEIVED
   SORTED
@@ -93,4 +140,18 @@ enum ContainerEventType {
   CONTAINER_CLOSED
   CONTAINER_DEPARTED
   CONTAINER_ARRIVED
+}
+
+enum TrailerStatus {
+  OPEN
+  CLOSED
+  IN_TRANSIT
+  ARRIVED
+}
+
+enum TrailerEventType {
+  TRAILER_CREATED
+  TRAILER_CLOSED
+  TRAILER_DEPARTED
+  TRAILER_ARRIVED
 }
