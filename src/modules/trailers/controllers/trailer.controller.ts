@@ -2,6 +2,7 @@ import {Body, Controller, Post, Param,} from '@nestjs/common';
 import { TrailerService } from '../services/trailer.service';
 import { CreateTrailerDto } from '../dto/create-trailer.dto';
 import { LoadContainerDto } from '../dto/load-container.dto';
+import { UnloadContainerDto } from '../dto/unload-container.dto';
 
 @Controller('trailers')
 export class TrailerController {
@@ -22,6 +23,17 @@ loadContainer(
   @Body() dto: LoadContainerDto,
 ) {
   return this.trailerService.loadContainer(
+    trailerId,
+    dto,
+  );
+}
+
+@Post(':trailerId/unload-container')
+unloadContainer(
+  @Param('trailerId') trailerId: string,
+  @Body() dto: UnloadContainerDto,
+) {
+  return this.trailerService.unloadContainer(
     trailerId,
     dto,
   );

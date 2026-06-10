@@ -7,6 +7,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CreateTrailerDto } from '../dto/create-trailer.dto';
 
 import { LoadContainerDto } from '../dto/load-container.dto';
+import { UnloadContainerDto } from '../dto/unload-container.dto';
 
 @Injectable()
 export class TrailerService {
@@ -106,6 +107,86 @@ export class TrailerService {
         data: {
           containerCount: {
             increment: 1,
+          },
+        },
+      });
+
+      return {
+        success: true,
+        trailerId,
+        containerId: container.id,
+      };
+    },
+  );
+}
+
+async unloadContainer(
+  trailerId: string,
+  dto: UnloadContainerDto,
+) {
+  return this.prisma.$transaction(
+    async (tx) => {
+
+      const trailer =
+        await tx.trailerSnapshot.findUnique({
+          where: { id: trailerId },
+        });
+
+      if (!trailer) {
+        throw new NotFoundException(
+          'Trailer not found',
+        );
+      }
+
+      const container =
+        await tx.containerSnapshot.findUnique({
+          where: {
+            containerBarcode:
+              dto.containerBarcode,
+          },
+        });
+
+      if (!container) {
+        throw new NotFoundException(
+          'Container not found',
+        );
+      }
+
+      if (
+        container.currentTrailerId !== trailerId
+      ) {
+        throw new BadRequestException(
+          'Container is not assigned to this trailer',
+        );
+      }
+
+      await tx.containerTrailerHistory.updateMany({
+        where: {
+          containerId: container.id,
+          trailerId,
+          unloadedAt: null,
+        },
+        data: {
+          unloadedAt: new Date(),
+        },
+      });
+
+      await tx.containerSnapshot.update({
+        where: {
+          id: container.id,
+        },
+        data: {
+          currentTrailerId: null,
+        },
+      });
+
+      await tx.trailerSnapshot.update({
+        where: {
+          id: trailerId,
+        },
+        data: {
+          containerCount: {
+            decrement: 1,
           },
         },
       });
