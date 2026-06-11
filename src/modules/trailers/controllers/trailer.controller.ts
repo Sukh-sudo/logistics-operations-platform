@@ -3,6 +3,8 @@ import { TrailerService } from '../services/trailer.service';
 import { CreateTrailerDto } from '../dto/create-trailer.dto';
 import { LoadContainerDto } from '../dto/load-container.dto';
 import { UnloadContainerDto } from '../dto/unload-container.dto';
+import { LoadPackageDto } from '../dto/load-package.dto';
+import { UnloadPackageDto } from '../dto/unload-package.dto';
 
 @Controller('trailers')
 export class TrailerController {
@@ -38,4 +40,27 @@ unloadContainer(
     dto,
   );
 }
+
+@Post(':trailerId/load-package')
+loadPackage(
+  @Param('trailerId') trailerId: string,
+  @Body() dto: LoadPackageDto,
+) {
+  return this.trailerService.loadPackage(
+    trailerId,
+    dto,
+  );
+}
+
+@Post(':trailerId/unload-package')
+unloadPackage(
+  @Param('trailerId') trailerId: string,
+  @Body() dto: UnloadPackageDto,
+) {
+  return this.trailerService.unloadPackage(
+    trailerId,
+    dto,
+  );
+}
+
 }

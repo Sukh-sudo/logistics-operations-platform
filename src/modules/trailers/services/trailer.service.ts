@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, } from '@nestjs/common';
 
-import {TrailerEventType, TrailerStatus,} from '@prisma/client';
+import {TrailerEventType, TrailerStatus,PackageEventType, PackageStatus,} from '@prisma/client';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 
@@ -8,6 +8,8 @@ import { CreateTrailerDto } from '../dto/create-trailer.dto';
 
 import { LoadContainerDto } from '../dto/load-container.dto';
 import { UnloadContainerDto } from '../dto/unload-container.dto';
+import { LoadPackageDto } from '../dto/load-package.dto';
+import { UnloadPackageDto } from '../dto/unload-package.dto';
 
 @Injectable()
 export class TrailerService {
@@ -214,4 +216,176 @@ async unloadContainer(
     },
   );
 }
+
+async loadPackage(
+  trailerId: string,
+  dto: LoadPackageDto,
+) {
+  return this.prisma.$transaction(
+    async (tx) => {
+
+      const trailer =
+        await tx.trailerSnapshot.findUnique({
+          where: { id: trailerId },
+        });
+
+      if (!trailer) {
+        throw new NotFoundException(
+          'Trailer not found',
+        );
+      }
+
+      const packageSnapshot =
+        await tx.packageSnapshot.findUnique({
+          where: {
+            trackingNumber: dto.trackingNumber,
+          },
+        });
+
+      if (!packageSnapshot) {
+        throw new NotFoundException(
+          'Package not found',
+        );
+      }
+
+      if (packageSnapshot.currentTrailerId) {
+        throw new BadRequestException(
+          'Package already assigned to a trailer',
+        );
+      }
+
+      await tx.packageTrailerHistory.create({
+        data: {
+          packageId: packageSnapshot.id,
+          trailerId,
+        },
+      });
+
+      await tx.packageEvent.create({
+        data: {
+          packageId: packageSnapshot.id,
+          eventType:
+            PackageEventType.PACKAGE_LOADED_TO_TRAILER,
+        },
+      });
+
+      await tx.packageSnapshot.update({
+        where: {
+          id: packageSnapshot.id,
+        },
+        data: {
+          currentTrailerId: trailerId,
+          currentStatus: PackageStatus.IN_TRAILER,
+        },
+      });
+
+      await tx.trailerSnapshot.update({
+        where: {
+          id: trailerId,
+        },
+        data: {
+          packageCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      return {
+        success: true,
+        packageId: packageSnapshot.id,
+        trailerId,
+      };
+    },
+  );
+}
+
+async unloadPackage(
+  trailerId: string,
+  dto: UnloadPackageDto,
+) {
+  return this.prisma.$transaction(
+    async (tx) => {
+
+      const trailer =
+        await tx.trailerSnapshot.findUnique({
+          where: { id: trailerId },
+        });
+
+      if (!trailer) {
+        throw new NotFoundException(
+          'Trailer not found',
+        );
+      }
+
+      const packageSnapshot =
+        await tx.packageSnapshot.findUnique({
+          where: {
+            trackingNumber: dto.trackingNumber,
+          },
+        });
+
+      if (!packageSnapshot) {
+        throw new NotFoundException(
+          'Package not found',
+        );
+      }
+
+      if (
+        packageSnapshot.currentTrailerId !==
+        trailerId
+      ) {
+        throw new BadRequestException(
+          'Package is not assigned to this trailer',
+        );
+      }
+
+      await tx.packageTrailerHistory.updateMany({
+        where: {
+          packageId: packageSnapshot.id,
+          trailerId,
+          unloadedAt: null,
+        },
+        data: {
+          unloadedAt: new Date(),
+        },
+      });
+
+      await tx.packageEvent.create({
+        data: {
+          packageId: packageSnapshot.id,
+          eventType:
+            PackageEventType.PACKAGE_UNLOADED_FROM_TRAILER,
+        },
+      });
+
+      await tx.packageSnapshot.update({
+        where: {
+          id: packageSnapshot.id,
+        },
+        data: {
+          currentTrailerId: null,
+          currentStatus: PackageStatus.ARRIVED,
+        },
+      });
+
+      await tx.trailerSnapshot.update({
+        where: {
+          id: trailerId,
+        },
+        data: {
+          packageCount: {
+            decrement: 1,
+          },
+        },
+      });
+
+      return {
+        success: true,
+        packageId: packageSnapshot.id,
+        trailerId,
+      };
+    },
+  );
+}
+
 }
