@@ -7,6 +7,9 @@ import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 describe('Trailers (e2e)', () => {
   let app: INestApplication;
@@ -37,6 +40,7 @@ await app.init();
   afterAll(async () => {
     if (app) {
       await app.close();
+      await prisma.$disconnect();
     }
   });
 
@@ -391,6 +395,89 @@ it('should decrement trailer container count', async () => {
     .toBe(0);
 });
 
+it('should create CONTAINER_LOADED_TO_TRAILER event', async () => {
 
+  const container =
+    await request(app.getHttpServer())
+      .post('/containers')
+      .send({
+        containerBarcode: `CONT-EVENT-${Date.now()}`,
+      });
+
+  const trailer =
+    await request(app.getHttpServer())
+      .post('/trailers')
+      .send({
+        trailerBarcode: `TRL-EVENT-${Date.now()}`,
+      });
+
+  const trailerId =
+    trailer.body.snapshot.id;
+
+  await request(app.getHttpServer())
+    .post(
+      `/trailers/${trailerId}/load-container`,
+    )
+    .send({
+      containerBarcode:
+        container.body.snapshot.containerBarcode,
+    })
+    .expect(201);
+
+});
+it('should create CONTAINER_UNLOADED_FROM_TRAILER event', async () => {
+
+  const barcode =
+    `CONT-UNLOAD-EVENT-${Date.now()}`;
+
+  const container =
+    await request(app.getHttpServer())
+      .post('/containers')
+      .send({
+        containerBarcode: barcode,
+      })
+      .expect(201);
+
+  const trailer =
+    await request(app.getHttpServer())
+      .post('/trailers')
+      .send({
+        trailerBarcode:
+          `TRL-UNLOAD-EVENT-${Date.now()}`,
+      })
+      .expect(201);
+
+  const trailerId =
+    trailer.body.snapshot.id;
+
+  await request(app.getHttpServer())
+    .post(
+      `/trailers/${trailerId}/load-container`,
+    )
+    .send({
+      containerBarcode: barcode,
+    })
+    .expect(201);
+
+  await request(app.getHttpServer())
+    .post(
+      `/trailers/${trailerId}/unload-container`,
+    )
+    .send({
+      containerBarcode: barcode,
+    })
+    .expect(201);
+
+  const event =
+    await prisma.trailerEvent.findFirst({
+      where: {
+        trailerId,
+        eventType:
+          'CONTAINER_UNLOADED_FROM_TRAILER',
+      },
+    });
+
+  expect(event).not.toBeNull();
+});
 
 });

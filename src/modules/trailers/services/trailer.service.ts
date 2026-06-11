@@ -83,7 +83,14 @@ export class TrailerService {
             'Container already assigned to a trailer',
         );
       }
-
+      
+      await tx.trailerEvent.create({
+  data: {
+    trailerId,
+    eventType:
+      TrailerEventType.CONTAINER_LOADED_TO_TRAILER,
+  },
+});
       await tx.containerTrailerHistory.create({
         data: {
           containerId: container.id,
@@ -159,6 +166,14 @@ async unloadContainer(
           'Container is not assigned to this trailer',
         );
       }
+
+      await tx.trailerEvent.create({
+  data: {
+    trailerId,
+    eventType:
+      TrailerEventType.CONTAINER_UNLOADED_FROM_TRAILER,
+  },
+});
 
       await tx.containerTrailerHistory.updateMany({
         where: {
