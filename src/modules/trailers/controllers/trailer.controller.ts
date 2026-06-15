@@ -1,4 +1,4 @@
-import {Body, Controller, Post, Param,} from '@nestjs/common';
+import {Body, Controller, Post, Param, Get,} from '@nestjs/common';
 import { TrailerService } from '../services/trailer.service';
 import { CreateTrailerDto } from '../dto/create-trailer.dto';
 import { LoadContainerDto } from '../dto/load-container.dto';
@@ -60,6 +60,26 @@ unloadPackage(
   return this.trailerService.unloadPackage(
     trailerId,
     dto,
+  );
+}
+
+@Get(':trailerBarcode')
+getTrailer(
+  @Param('trailerBarcode')
+  trailerBarcode: string,
+) {
+  return this.trailerService.getTrailer(
+    trailerBarcode,
+  );
+}
+
+@Get(':trailerBarcode/history')
+getTrailerHistory(
+  @Param('trailerBarcode')
+  trailerBarcode: string,
+) {
+  return this.trailerService.getTrailerHistory(
+    trailerBarcode,
   );
 }
 

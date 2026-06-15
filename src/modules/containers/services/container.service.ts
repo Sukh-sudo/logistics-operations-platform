@@ -229,4 +229,47 @@ export class ContainerService {
     };
   });
 } 
+
+async getContainer(
+  containerBarcode: string,
+) {
+  const snapshot =
+    await this.prisma.containerSnapshot.findUnique({
+      where: { containerBarcode },
+    });
+
+  if (!snapshot) {
+    throw new NotFoundException(
+      'Container not found',
+    );
+  }
+
+  return snapshot;
+}
+
+async getContainerHistory(
+  containerBarcode: string,
+) {
+  const snapshot =
+    await this.prisma.containerSnapshot.findUnique({
+      where: { containerBarcode },
+      include: {
+        events: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+  if (!snapshot) {
+    throw new NotFoundException(
+      'Container not found',
+    );
+  }
+
+  return snapshot.events;
+}
+
+
 }

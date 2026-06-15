@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Get, Param, } from '@nestjs/common';
 import { CreatePackageEventDto } from '../dto/create-package-event.dto';
 import { PackageService } from '../services/package.service';
 import { AppLogger } from '../../../common/utils/logger';
@@ -26,4 +26,22 @@ export class PackageEventsController {
       req.requestId,
     );
   }
+
+@Get(':trackingNumber')
+  getPackage(
+  @Param('trackingNumber') trackingNumber: string,
+) {
+  return this.packageService.getPackage(
+    trackingNumber,
+  );
+}
+@Get(':trackingNumber/history')
+getPackageHistory(
+  @Param('trackingNumber') trackingNumber: string,
+) {
+  return this.packageService.getPackageHistory(
+    trackingNumber,
+  );
+}
+
 }

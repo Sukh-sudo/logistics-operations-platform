@@ -1,4 +1,4 @@
-import {Body,Controller,Param,Post,} from '@nestjs/common';
+import {Body,Controller,Param,Post, Get, } from '@nestjs/common';
 
 import { CreateContainerDto } from '../dto/create-container.dto';
 import { LoadPackageDto } from '../dto/load-package.dto';
@@ -38,4 +38,26 @@ unloadPackage(
     dto,
   );
 }
+
+@Get(':containerBarcode')
+getContainer(
+  @Param('containerBarcode')
+  containerBarcode: string,
+) {
+  return this.containerService.getContainer(
+    containerBarcode,
+  );
+}
+
+@Get(':containerBarcode/history')
+getContainerHistory(
+  @Param('containerBarcode')
+  containerBarcode: string,
+) {
+  return this.containerService.getContainerHistory(
+    containerBarcode,
+  );
+}
+
+
 }

@@ -388,4 +388,46 @@ async unloadPackage(
   );
 }
 
+async getTrailer(
+  trailerBarcode: string,
+) {
+  const snapshot =
+    await this.prisma.trailerSnapshot.findUnique({
+      where: { trailerBarcode },
+    });
+
+  if (!snapshot) {
+    throw new NotFoundException(
+      'Trailer not found',
+    );
+  }
+
+  return snapshot;
+}
+
+async getTrailerHistory(
+  trailerBarcode: string,
+) {
+  const snapshot =
+    await this.prisma.trailerSnapshot.findUnique({
+      where: { trailerBarcode },
+      include: {
+        events: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+  if (!snapshot) {
+    throw new NotFoundException(
+      'Trailer not found',
+    );
+  }
+
+  return snapshot.events;
+}
+
+
 }

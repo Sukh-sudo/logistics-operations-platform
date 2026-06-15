@@ -1,6 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException,  } from '@nestjs/common';
 import {PackageEventType,PackageStatus,} from '@prisma/client';
-import { BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 // Kafka publishing service
 import { KafkaService } from '../../../infrastructure/kafka/kafka.service';
@@ -138,5 +137,48 @@ export class PackageService {
 
   return result;
 }
+
+async getPackage(
+  trackingNumber: string,
+) {
+  const snapshot =
+    await this.prisma.packageSnapshot.findUnique({
+      where: { trackingNumber },
+    });
+
+  if (!snapshot) {
+    throw new NotFoundException(
+      'Package not found',
+    );
+  }
+
+  return snapshot;
+}
+
+async getPackageHistory(
+  trackingNumber: string,
+) {
+  const snapshot =
+    await this.prisma.packageSnapshot.findUnique({
+      where: { trackingNumber },
+      include: {
+        events: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+  if (!snapshot) {
+    throw new NotFoundException(
+      'Package not found',
+    );
+  }
+
+  return snapshot.events;
+}
+
+
 }
 
