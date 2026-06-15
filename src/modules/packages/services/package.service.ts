@@ -179,6 +179,74 @@ async getPackageHistory(
   return snapshot.events;
 }
 
+async getPackageLocation(
+  trackingNumber: string,
+) {
+  const packageSnapshot =
+    await this.prisma.packageSnapshot.findUnique({
+      where: {
+        trackingNumber,
+      },
+    });
+
+  if (!packageSnapshot) {
+    throw new NotFoundException(
+      'Package not found',
+    );
+  }
+
+  let containerBarcode: string | null = null;
+  let trailerBarcode: string | null = null;
+
+  if (packageSnapshot.currentContainerId) {
+    const container =
+      await this.prisma.containerSnapshot.findUnique({
+        where: {
+          id: packageSnapshot.currentContainerId,
+        },
+      });
+
+    containerBarcode =
+      container?.containerBarcode ?? null;
+
+    if (container?.currentTrailerId) {
+      const trailer =
+        await this.prisma.trailerSnapshot.findUnique({
+          where: {
+            id: container.currentTrailerId,
+          },
+        });
+
+      trailerBarcode =
+        trailer?.trailerBarcode ?? null;
+    }
+  }
+
+  if (
+    !trailerBarcode &&
+    packageSnapshot.currentTrailerId
+  ) {
+    const trailer =
+      await this.prisma.trailerSnapshot.findUnique({
+        where: {
+          id: packageSnapshot.currentTrailerId,
+        },
+      });
+
+    trailerBarcode =
+      trailer?.trailerBarcode ?? null;
+  }
+
+  return {
+    trackingNumber:
+      packageSnapshot.trackingNumber,
+    currentStatus:
+      packageSnapshot.currentStatus,
+    containerBarcode,
+    trailerBarcode,
+  };
+}
+
 
 }
 

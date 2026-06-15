@@ -27,19 +27,31 @@ export class PackageEventsController {
     );
   }
 
-@Get(':trackingNumber')
-  getPackage(
-  @Param('trackingNumber') trackingNumber: string,
-) {
-  return this.packageService.getPackage(
-    trackingNumber,
-  );
-}
+
 @Get(':trackingNumber/history')
 getPackageHistory(
   @Param('trackingNumber') trackingNumber: string,
 ) {
   return this.packageService.getPackageHistory(
+    trackingNumber,
+  );
+}
+
+@Get(':trackingNumber/location')
+getPackageLocation(
+  @Param('trackingNumber')
+  trackingNumber: string,
+) {
+  return this.packageService.getPackageLocation(
+    trackingNumber,
+  );
+}
+
+@Get(':trackingNumber')
+  getPackage(
+  @Param('trackingNumber') trackingNumber: string,
+) {
+  return this.packageService.getPackage(
     trackingNumber,
   );
 }
