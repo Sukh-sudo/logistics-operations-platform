@@ -379,4 +379,97 @@ it('should create PACKAGE_UNLOADED_FROM_CONTAINER event', async () => {
   ).toBe(true);
 });
 
+it('should return packages inside container', async () => {
+  const packageA = `PKG-A-${Date.now()}`;
+  const packageB = `PKG-B-${Date.now()}`;
+
+  // Create packages
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber: packageA,
+      eventType: 'PACKAGE_RECEIVED',
+      terminalId: 1,
+      employeeId: 100,
+    })
+    .expect(201);
+
+  await request(app.getHttpServer())
+    .post('/package-events')
+    .send({
+      trackingNumber: packageB,
+      eventType: 'PACKAGE_RECEIVED',
+      terminalId: 1,
+      employeeId: 100,
+    })
+    .expect(201);
+
+  // Create container
+  const containerResponse = await request(
+    app.getHttpServer(),
+  )
+    .post('/containers')
+    .send({
+      containerBarcode: `CONT-${Date.now()}`,
+    })
+    .expect(201);
+
+  const containerId =
+    containerResponse.body.snapshot.id;
+
+  const containerBarcode =
+    containerResponse.body.snapshot.containerBarcode;
+
+  // Load packages
+  await request(app.getHttpServer())
+    .post(
+      `/containers/${containerId}/load-package`,
+    )
+    .send({
+      trackingNumber: packageA,
+    })
+    .expect(201);
+
+  await request(app.getHttpServer())
+    .post(
+      `/containers/${containerId}/load-package`,
+    )
+    .send({
+      trackingNumber: packageB,
+    })
+    .expect(201);
+
+  // Query container packages
+  const response = await request(
+    app.getHttpServer(),
+  )
+    .get(
+      `/containers/${containerBarcode}/packages`,
+    )
+    .expect(200);
+
+  expect(response.body.containerBarcode)
+    .toBe(containerBarcode);
+
+  expect(response.body.packageCount)
+    .toBe(2);
+
+  expect(
+    response.body.packages.map(
+      (p: any) => p.trackingNumber,
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      packageA,
+      packageB,
+    ]),
+  );
+});
+
+it('should return 404 for unknown container', async () => {
+  await request(app.getHttpServer())
+    .get('/containers/UNKNOWN/packages')
+    .expect(404);
+});
+
 });

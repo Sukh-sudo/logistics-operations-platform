@@ -39,6 +39,17 @@ unloadPackage(
   );
 }
 
+
+@Get(':containerBarcode/packages')
+getContainerPackages(
+  @Param('containerBarcode')
+  containerBarcode: string,
+) {
+  return this.containerService.getContainerPackages(
+    containerBarcode,
+  );
+}
+
 @Get(':containerBarcode')
 getContainer(
   @Param('containerBarcode')
@@ -58,6 +69,7 @@ getContainerHistory(
     containerBarcode,
   );
 }
+
 
 
 }

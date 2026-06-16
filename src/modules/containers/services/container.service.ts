@@ -271,5 +271,37 @@ async getContainerHistory(
   return snapshot.events;
 }
 
+async getContainerPackages(
+  containerBarcode: string,
+) {
+  const container =
+    await this.prisma.containerSnapshot.findUnique({
+      where: {
+        containerBarcode,
+      },
+    });
+
+  if (!container) {
+    throw new NotFoundException(
+      'Container not found',
+    );
+  }
+
+  const packages =
+    await this.prisma.packageSnapshot.findMany({
+      where: {
+        currentContainerId: container.id,
+      },
+      orderBy: {
+        trackingNumber: 'asc',
+      },
+    });
+
+  return {
+    containerBarcode,
+    packageCount: packages.length,
+    packages,
+  };
+}
 
 }
