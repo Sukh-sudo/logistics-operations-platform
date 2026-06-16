@@ -429,5 +429,37 @@ async getTrailerHistory(
   return snapshot.events;
 }
 
+async getTrailerContainers(
+  trailerBarcode: string,
+) {
+  const trailer =
+    await this.prisma.trailerSnapshot.findUnique({
+      where: {
+        trailerBarcode,
+      },
+    });
+
+  if (!trailer) {
+    throw new NotFoundException(
+      'Trailer not found',
+    );
+  }
+
+  const containers =
+    await this.prisma.containerSnapshot.findMany({
+      where: {
+        currentTrailerId: trailer.id,
+      },
+      orderBy: {
+        containerBarcode: 'asc',
+      },
+    });
+
+  return {
+    trailerBarcode,
+    containerCount: containers.length,
+    containers,
+  };
+}
 
 }

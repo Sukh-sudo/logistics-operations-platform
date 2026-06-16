@@ -480,4 +480,85 @@ it('should create CONTAINER_UNLOADED_FROM_TRAILER event', async () => {
   expect(event).not.toBeNull();
 });
 
+it('should return containers inside trailer', async () => {
+  const trailerResponse = await request(
+    app.getHttpServer(),
+  )
+    .post('/trailers')
+    .send({
+      trailerBarcode: `TRL-${Date.now()}`,
+    })
+    .expect(201);
+
+  const trailerId =
+    trailerResponse.body.snapshot.id;
+
+  const trailerBarcode =
+    trailerResponse.body.snapshot.trailerBarcode;
+
+  const containerA =
+    await request(app.getHttpServer())
+      .post('/containers')
+      .send({
+        containerBarcode: `CONT-A-${Date.now()}`,
+      })
+      .expect(201);
+
+  const containerB =
+    await request(app.getHttpServer())
+      .post('/containers')
+      .send({
+        containerBarcode: `CONT-B-${Date.now()}`,
+      })
+      .expect(201);
+
+  await request(app.getHttpServer())
+    .post(
+      `/trailers/${trailerId}/load-container`,
+    )
+    .send({
+      containerBarcode:
+        containerA.body.snapshot.containerBarcode,
+    })
+    .expect(201);
+
+  await request(app.getHttpServer())
+    .post(
+      `/trailers/${trailerId}/load-container`,
+    )
+    .send({
+      containerBarcode:
+        containerB.body.snapshot.containerBarcode,
+    })
+    .expect(201);
+
+  const response = await request(
+    app.getHttpServer(),
+  )
+    .get(
+      `/trailers/${trailerBarcode}/containers`,
+    )
+    .expect(200);
+
+  expect(response.body.containerCount)
+    .toBe(2);
+
+  expect(
+    response.body.containers.map(
+      (c: any) => c.containerBarcode,
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      containerA.body.snapshot.containerBarcode,
+      containerB.body.snapshot.containerBarcode,
+    ]),
+  );
+});
+
+it('should return 404 for unknown trailer', async () => {
+  await request(app.getHttpServer())
+    .get('/trailers/UNKNOWN/containers')
+    .expect(404);
+});
+
 });

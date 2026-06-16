@@ -63,6 +63,16 @@ unloadPackage(
   );
 }
 
+@Get(':trailerBarcode/containers')
+getTrailerContainers(
+  @Param('trailerBarcode')
+  trailerBarcode: string,
+) {
+  return this.trailerService.getTrailerContainers(
+    trailerBarcode,
+  );
+}
+
 @Get(':trailerBarcode')
 getTrailer(
   @Param('trailerBarcode')
