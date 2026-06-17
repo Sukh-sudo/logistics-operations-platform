@@ -462,4 +462,93 @@ async getTrailerContainers(
   };
 }
 
+async getTrailerPackages(
+  trailerBarcode: string,
+) {
+  // Find trailer
+  const trailer =
+    await this.prisma.trailerSnapshot.findUnique({
+      where: {
+        trailerBarcode,
+      },
+    });
+
+  if (!trailer) {
+    throw new NotFoundException(
+      'Trailer not found',
+    );
+  }
+
+  // Find all containers currently on the trailer
+  const containers =
+    await this.prisma.containerSnapshot.findMany({
+      where: {
+        currentTrailerId: trailer.id,
+      },
+    });
+
+  const containerIds = containers.map(
+    (container) => container.id,
+  );
+
+  const containerLookup = new Map(
+    containers.map((container) => [
+      container.id,
+      container.containerBarcode,
+    ]),
+  );
+
+  // Packages inside containers
+  const containerPackages =
+    await this.prisma.packageSnapshot.findMany({
+      where: {
+        currentContainerId: {
+          in: containerIds.length
+            ? containerIds
+            : [''],
+        },
+      },
+      orderBy: {
+        trackingNumber: 'asc',
+      },
+    });
+
+  // Loose packages on trailer
+  const loosePackages =
+    await this.prisma.packageSnapshot.findMany({
+      where: {
+        currentTrailerId: trailer.id,
+      },
+      orderBy: {
+        trackingNumber: 'asc',
+      },
+    });
+
+  const packages = [
+    ...containerPackages.map((pkg) => ({
+      trackingNumber: pkg.trackingNumber,
+      currentStatus: pkg.currentStatus,
+      location: 'CONTAINER',
+      containerBarcode:
+        containerLookup.get(
+          pkg.currentContainerId!,
+        ) ?? null,
+    })),
+
+    ...loosePackages.map((pkg) => ({
+      trackingNumber: pkg.trackingNumber,
+      currentStatus: pkg.currentStatus,
+      location: 'LOOSE',
+      containerBarcode: null,
+    })),
+  ];
+
+  return {
+    trailerBarcode,
+    packageCount: packages.length,
+    packages,
+  };
+}
+
+
 }

@@ -63,12 +63,32 @@ unloadPackage(
   );
 }
 
+@Get(':trailerBarcode/history')
+getTrailerHistory(
+  @Param('trailerBarcode')
+  trailerBarcode: string,
+) {
+  return this.trailerService.getTrailerHistory(
+    trailerBarcode,
+  );
+}
+
 @Get(':trailerBarcode/containers')
 getTrailerContainers(
   @Param('trailerBarcode')
   trailerBarcode: string,
 ) {
   return this.trailerService.getTrailerContainers(
+    trailerBarcode,
+  );
+}
+
+@Get(':trailerBarcode/packages')
+getTrailerPackages(
+  @Param('trailerBarcode')
+  trailerBarcode: string,
+) {
+  return this.trailerService.getTrailerPackages(
     trailerBarcode,
   );
 }
@@ -83,14 +103,5 @@ getTrailer(
   );
 }
 
-@Get(':trailerBarcode/history')
-getTrailerHistory(
-  @Param('trailerBarcode')
-  trailerBarcode: string,
-) {
-  return this.trailerService.getTrailerHistory(
-    trailerBarcode,
-  );
-}
 
 }
