@@ -179,5 +179,207 @@ export class DashboardService {
   );
 }
 
+// Returns all containers for the operations dashboard
+async getContainers() {
+  // Fetch all container snapshots
+  const containers =
+    await this.prisma.containerSnapshot.findMany({
+      orderBy: {
+        containerBarcode: 'asc',
+      },
+    });
+
+  return Promise.all(
+    containers.map(async (container) => {
+      let assignedTrailer: string | null = null;
+
+      // If the container is assigned to a trailer,
+      // retrieve the trailer barcode.
+      if (container.currentTrailerId) {
+        const trailer =
+          await this.prisma.trailerSnapshot.findUnique({
+            where: {
+              id: container.currentTrailerId,
+            },
+            select: {
+              trailerBarcode: true,
+            },
+          });
+
+        assignedTrailer =
+          trailer?.trailerBarcode ?? null;
+      }
+
+      return {
+        containerBarcode: container.containerBarcode,
+        status: container.currentStatus,
+        packageCount: container.packageCount,
+        assignedTrailer,
+      };
+    }),
+  );
+}
+
+// Returns the most recent operational events across the system
+// Returns the most recent activity across packages, containers and trailers
+async getRecentEvents(limit = 25) {
+  // Get the latest package events
+  const packageEvents =
+    await this.prisma.packageEvent.findMany({
+      take: limit,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        package: {
+          select: {
+            trackingNumber: true,
+          },
+        },
+      },
+    });
+
+  // Get the latest container events
+  const containerEvents =
+    await this.prisma.containerEvent.findMany({
+      take: limit,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        container: {
+          select: {
+            containerBarcode: true,
+          },
+        },
+      },
+    });
+
+  // Get the latest trailer events
+  const trailerEvents =
+    await this.prisma.trailerEvent.findMany({
+      take: limit,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        trailer: {
+          select: {
+            trailerBarcode: true,
+          },
+        },
+      },
+    });
+
+  // Combine everything into one timeline
+  const events = [
+    ...packageEvents.map((event) => ({
+      assetType: 'PACKAGE',
+      reference: event.package.trackingNumber,
+      event: event.eventType,
+      occurredAt: event.createdAt,
+    })),
+
+    ...containerEvents.map((event) => ({
+      assetType: 'CONTAINER',
+      reference: event.container.containerBarcode,
+      event: event.eventType,
+      occurredAt: event.createdAt,
+    })),
+
+    ...trailerEvents.map((event) => ({
+      assetType: 'TRAILER',
+      reference: event.trailer.trailerBarcode,
+      event: event.eventType,
+      occurredAt: event.createdAt,
+    })),
+  ];
+
+  // Return the newest events first
+  return events
+    .sort(
+      (a, b) =>
+        b.occurredAt.getTime() -
+        a.occurredAt.getTime(),
+    )
+    .slice(0, limit);
+}
+
+// Returns all packages with their current operational location
+async getPackages() {
+  const packages =
+    await this.prisma.packageSnapshot.findMany({
+      orderBy: {
+        trackingNumber: 'asc',
+      },
+    });
+
+  return Promise.all(
+    packages.map(async (pkg) => {
+      let containerBarcode: string | null = null;
+      let trailerBarcode: string | null = null;
+
+      // Resolve the container barcode
+      if (pkg.currentContainerId) {
+        const container =
+          await this.prisma.containerSnapshot.findUnique({
+            where: {
+              id: pkg.currentContainerId,
+            },
+            select: {
+              containerBarcode: true,
+              currentTrailerId: true,
+            },
+          });
+
+        if (container) {
+          containerBarcode = container.containerBarcode;
+
+          // Resolve the trailer through the container
+          if (container.currentTrailerId) {
+            const trailer =
+              await this.prisma.trailerSnapshot.findUnique({
+                where: {
+                  id: container.currentTrailerId,
+                },
+                select: {
+                  trailerBarcode: true,
+                },
+              });
+
+            trailerBarcode =
+              trailer?.trailerBarcode ?? null;
+          }
+        }
+      }
+
+      // Package loaded directly onto trailer
+      if (
+        !trailerBarcode &&
+        pkg.currentTrailerId
+      ) {
+        const trailer =
+          await this.prisma.trailerSnapshot.findUnique({
+            where: {
+              id: pkg.currentTrailerId,
+            },
+            select: {
+              trailerBarcode: true,
+            },
+          });
+
+        trailerBarcode =
+          trailer?.trailerBarcode ?? null;
+      }
+
+      return {
+        trackingNumber: pkg.trackingNumber,
+        status: pkg.currentStatus,
+        containerBarcode,
+        trailerBarcode,
+      };
+    }),
+  );
+}
 
 }
