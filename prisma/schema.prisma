@@ -18,6 +18,49 @@ model PackageSnapshot {
   events             PackageEvent[]
 }
 
+model Terminal {
+  id           Int               @id @default(autoincrement())
+  terminalCode String            @unique
+  name         String
+  city         String
+  province     String
+  country      String
+  timezone     String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  events       TerminalEvent[]
+  snapshot     TerminalSnapshot?
+}
+
+model TerminalEvent {
+  id            String            @id @default(cuid())
+  terminalId    Int
+  eventType     TerminalEventType
+  employeeId    Int?
+  correlationId String
+  payload       Json?
+  createdAt     DateTime          @default(now())
+  terminal      Terminal          @relation(fields: [terminalId], references: [id])
+
+  @@index([terminalId, createdAt])
+  @@index([correlationId])
+}
+
+model TerminalSnapshot {
+  id              String         @id @default(cuid())
+  terminalId      Int            @unique
+  currentStatus   TerminalStatus @default(ACTIVE)
+  packageCount    Int            @default(0)
+  containerCount  Int            @default(0)
+  trailerCount    Int            @default(0)
+  truckCount      Int            @default(0)
+  activeTripCount Int            @default(0)
+  employeeCount   Int            @default(0)
+  lastActivityAt  DateTime?
+  updatedAt       DateTime       @updatedAt
+  terminal        Terminal       @relation(fields: [terminalId], references: [id])
+}
+
 model PackageEvent {
   id         String           @id @default(cuid())
   packageId  String
@@ -30,13 +73,14 @@ model PackageEvent {
 }
 
 model ContainerSnapshot {
-  id               String           @id @default(cuid())
-  containerBarcode String           @unique
-  currentStatus    ContainerStatus
-  currentTrailerId String?
-  packageCount     Int              @default(0)
-  updatedAt        DateTime         @updatedAt
-  events           ContainerEvent[]
+  id                String           @id @default(cuid())
+  containerBarcode  String           @unique
+  currentStatus     ContainerStatus
+  currentTrailerId  String?
+  currentTerminalId Int?
+  packageCount      Int              @default(0)
+  updatedAt         DateTime         @updatedAt
+  events            ContainerEvent[]
 }
 
 model ContainerEvent {
@@ -58,13 +102,14 @@ model PackageContainerHistory {
 }
 
 model TrailerSnapshot {
-  id             String         @id @default(cuid())
-  trailerBarcode String         @unique
-  currentStatus  TrailerStatus
-  containerCount Int            @default(0)
-  packageCount   Int            @default(0)
-  updatedAt      DateTime       @updatedAt
-  events         TrailerEvent[]
+  id                String         @id @default(cuid())
+  trailerBarcode    String         @unique
+  currentStatus     TrailerStatus
+  containerCount    Int            @default(0)
+  packageCount      Int            @default(0)
+  currentTerminalId Int?
+  updatedAt         DateTime       @updatedAt
+  events            TrailerEvent[]
 }
 
 model TrailerEvent {
@@ -144,4 +189,28 @@ enum TrailerEventType {
 
   CONTAINER_LOADED_TO_TRAILER
   CONTAINER_UNLOADED_FROM_TRAILER
+}
+
+enum TerminalStatus {
+  ACTIVE
+  OPERATIONAL
+  MAINTENANCE
+  CLOSED
+}
+
+enum TerminalEventType {
+  TERMINAL_CREATED
+  TERMINAL_UPDATED
+  PACKAGE_RECEIVED
+  PACKAGE_TRANSFERRED
+  CONTAINER_RECEIVED
+  CONTAINER_TRANSFERRED
+  TRAILER_ARRIVED
+  TRAILER_DEPARTED
+}
+
+enum TerminalAssetType {
+  PACKAGE
+  CONTAINER
+  TRAILER
 }

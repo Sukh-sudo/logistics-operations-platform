@@ -18,6 +18,7 @@ describe('Search API (e2e)', () => {
 
     app.useGlobalPipes(
       new ValidationPipe({
+          
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,

@@ -18,6 +18,7 @@ import { ContainerModule } from './modules/containers/container.module';
 import { TrailerModule } from './modules/trailers/trailer.module';
 import { SearchModule } from './modules/search/search.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { TerminalModule } from './modules/terminals/terminal.module';
 
 @Module({
   imports: [
@@ -39,6 +40,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     SearchModule,
 
     DashboardModule,
+
+    TerminalModule,
   ],
 })
 export class AppModule implements NestModule {
