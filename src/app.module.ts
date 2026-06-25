@@ -19,6 +19,7 @@ import { TrailerModule } from './modules/trailers/trailer.module';
 import { SearchModule } from './modules/search/search.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { TerminalModule } from './modules/terminals/terminal.module';
+import { UserModule } from './modules/users/user.module';
 
 @Module({
   imports: [
@@ -42,6 +43,8 @@ import { TerminalModule } from './modules/terminals/terminal.module';
     DashboardModule,
 
     TerminalModule,
+
+    UserModule,
   ],
 })
 export class AppModule implements NestModule {
