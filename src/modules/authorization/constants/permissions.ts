@@ -1,0 +1,16 @@
+export const PERMISSIONS = {
+  PACKAGE_CREATE: 'package.create',
+  PACKAGE_VIEW: 'package.view',
+  PACKAGE_UPDATE: 'package.update',
+  PACKAGE_HISTORY: 'package.history',
+  CONTAINER_CREATE: 'container.create',
+  CONTAINER_LOAD: 'container.load',
+  CONTAINER_UNLOAD: 'container.unload',
+  TRAILER_CREATE: 'trailer.create',
+  TRAILER_LOAD: 'trailer.load',
+  TRAILER_DEPART: 'trailer.depart',
+  USER_MANAGE: 'user.manage',
+  ROLE_MANAGE: 'role.manage',
+  TERMINAL_MANAGE: 'terminal.manage',
+  SYSTEM_ADMIN: 'system.admin',
+} as const;

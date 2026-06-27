@@ -20,6 +20,8 @@ import { SearchModule } from './modules/search/search.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { TerminalModule } from './modules/terminals/terminal.module';
 import { UserModule } from './modules/users/user.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { AuthorizationModule } from './modules/authorization/authorization.module';
 
 @Module({
   imports: [
@@ -45,6 +47,10 @@ import { UserModule } from './modules/users/user.module';
     TerminalModule,
 
     UserModule,
+
+    AuthModule,
+
+    AuthorizationModule,
   ],
 })
 export class AppModule implements NestModule {

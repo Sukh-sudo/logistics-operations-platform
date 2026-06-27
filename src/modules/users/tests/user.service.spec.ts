@@ -48,12 +48,15 @@ describe('UserService', () => {
   const prisma = {
     $transaction: jest.fn((callback) => callback(tx)),
   };
+  const credentials = {
+    hashPassword: jest.fn().mockResolvedValue('hashed-password'),
+  };
 
   let service: UserService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new UserService(prisma as never);
+    service = new UserService(prisma as never, credentials as never);
   });
 
   it('creates an inactive user event and snapshot atomically', async () => {
@@ -81,6 +84,7 @@ describe('UserService', () => {
       email: ' Operator@Example.com ',
       firstName: ' Taylor ',
       lastName: ' Morgan ',
+      password: 'StrongPassword!1',
     });
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -90,6 +94,7 @@ describe('UserService', () => {
         email: 'operator@example.com',
         firstName: 'Taylor',
         lastName: 'Morgan',
+        passwordHash: 'hashed-password',
       },
     });
     expect(tx.userEvent.create).toHaveBeenCalledWith({
@@ -117,6 +122,7 @@ describe('UserService', () => {
         email: 'operator@example.com',
         firstName: 'Taylor',
         lastName: 'Morgan',
+        password: 'StrongPassword!1',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
   });

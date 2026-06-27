@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 import { UserStatus } from '@prisma/client';
 
@@ -32,6 +33,12 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MaxLength(80)
   lastName: string;
+
+  @ApiProperty({ minLength: 12 })
+  @IsString()
+  @MinLength(12)
+  @MaxLength(128)
+  password: string;
 
   @ApiPropertyOptional({ enum: UserStatus, default: UserStatus.INACTIVE })
   @IsOptional()

@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { IdentityAggregateType } from '@prisma/client';
 import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
@@ -18,12 +19,18 @@ import {
   UserActionDto,
 } from '../dto/identity-assignment.dto';
 import { UserService } from '../services/user.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../authorization/guards/permissions.guard';
 
 @Controller()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post('users')
+  @Permissions(PERMISSIONS.USER_MANAGE)
   createUser(
     @Body() dto: CreateUserDto,
     @Req() request: RequestWithId,
@@ -32,16 +39,19 @@ export class UserController {
   }
 
   @Get('users')
+  @Permissions(PERMISSIONS.USER_MANAGE)
   getUsers() {
     return this.userService.getUsers();
   }
 
   @Get('users/:id/history')
+  @Permissions(PERMISSIONS.USER_MANAGE)
   getUserHistory(@Param('id') id: string) {
     return this.userService.getUserHistory(id);
   }
 
   @Post('users/:id/activate')
+  @Permissions(PERMISSIONS.USER_MANAGE)
   activateUser(
     @Param('id') id: string,
     @Body() dto: UserActionDto,
@@ -55,6 +65,7 @@ export class UserController {
   }
 
   @Post('users/:id/deactivate')
+  @Permissions(PERMISSIONS.USER_MANAGE)
   deactivateUser(
     @Param('id') id: string,
     @Body() dto: UserActionDto,
@@ -68,6 +79,7 @@ export class UserController {
   }
 
   @Post('users/:id/roles')
+  @Permissions(PERMISSIONS.USER_MANAGE)
   assignRole(
     @Param('id') id: string,
     @Body() dto: AssignRoleDto,
@@ -82,6 +94,7 @@ export class UserController {
   }
 
   @Delete('users/:id/roles/:roleId')
+  @Permissions(PERMISSIONS.USER_MANAGE)
   removeRole(
     @Param('id') id: string,
     @Param('roleId') roleId: string,
@@ -97,11 +110,13 @@ export class UserController {
   }
 
   @Get('users/:id')
+  @Permissions(PERMISSIONS.USER_MANAGE)
   getUser(@Param('id') id: string) {
     return this.userService.getUser(id);
   }
 
   @Post('roles')
+  @Permissions(PERMISSIONS.ROLE_MANAGE)
   createRole(
     @Body() dto: CreateRoleDto,
     @Req() request: RequestWithId,
@@ -110,11 +125,13 @@ export class UserController {
   }
 
   @Get('roles')
+  @Permissions(PERMISSIONS.ROLE_MANAGE)
   getRoles() {
     return this.userService.getRoles();
   }
 
   @Get('roles/:id/history')
+  @Permissions(PERMISSIONS.ROLE_MANAGE)
   getRoleHistory(@Param('id') id: string) {
     return this.userService.getIdentityHistory(
       IdentityAggregateType.ROLE,
@@ -123,6 +140,7 @@ export class UserController {
   }
 
   @Post('roles/:id/permissions')
+  @Permissions(PERMISSIONS.ROLE_MANAGE)
   assignPermission(
     @Param('id') id: string,
     @Body() dto: AssignPermissionDto,
@@ -137,6 +155,7 @@ export class UserController {
   }
 
   @Post('permissions')
+  @Permissions(PERMISSIONS.ROLE_MANAGE)
   createPermission(
     @Body() dto: CreatePermissionDto,
     @Req() request: RequestWithId,
@@ -145,11 +164,13 @@ export class UserController {
   }
 
   @Get('permissions')
+  @Permissions(PERMISSIONS.ROLE_MANAGE)
   getPermissions() {
     return this.userService.getPermissions();
   }
 
   @Get('permissions/:id/history')
+  @Permissions(PERMISSIONS.ROLE_MANAGE)
   getPermissionHistory(@Param('id') id: string) {
     return this.userService.getIdentityHistory(
       IdentityAggregateType.PERMISSION,

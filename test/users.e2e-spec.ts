@@ -4,12 +4,14 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
+import { createAuthenticatedAdmin } from './authenticated-admin.fixture';
 
 const prisma = new PrismaClient();
 
 describe('Users (e2e)', () => {
   let app: INestApplication;
   let sequence = 0;
+  let authorization: string;
 
   const unique = (prefix: string) =>
     `${prefix}-${Date.now().toString(36)}-${sequence++}`;
@@ -29,6 +31,7 @@ describe('Users (e2e)', () => {
     );
     app.useGlobalFilters(new PrismaExceptionFilter());
     await app.init();
+    authorization = await createAuthenticatedAdmin(app, prisma, 'users-admin');
   });
 
   afterAll(async () => {
@@ -40,6 +43,7 @@ describe('Users (e2e)', () => {
     const suffix = unique('identity');
     const permission = await request(app.getHttpServer())
       .post('/permissions')
+      .set('Authorization', authorization)
       .send({
         code: `packages.receive.${suffix}`,
         description: 'Receive packages',
@@ -47,6 +51,7 @@ describe('Users (e2e)', () => {
       .expect(201);
     const role = await request(app.getHttpServer())
       .post('/roles')
+      .set('Authorization', authorization)
       .send({
         name: `operator ${suffix}`,
         description: 'Terminal operator',
@@ -55,16 +60,19 @@ describe('Users (e2e)', () => {
 
     await request(app.getHttpServer())
       .post(`/roles/${role.body.role.id}/permissions`)
+      .set('Authorization', authorization)
       .send({ permissionId: permission.body.permission.id })
       .expect(201);
 
     const created = await request(app.getHttpServer())
       .post('/users')
+      .set('Authorization', authorization)
       .send({
         employeeNumber: unique('emp'),
         email: `${unique('operator')}@example.com`,
         firstName: 'Taylor',
         lastName: 'Morgan',
+        password: 'StrongPassword!1',
       })
       .expect(201);
     const userId = created.body.user.id;
@@ -74,11 +82,13 @@ describe('Users (e2e)', () => {
 
     await request(app.getHttpServer())
       .post(`/users/${userId}/activate`)
+      .set('Authorization', authorization)
       .send({})
       .expect(201);
 
     const assigned = await request(app.getHttpServer())
       .post(`/users/${userId}/roles`)
+      .set('Authorization', authorization)
       .send({ roleId: role.body.role.id })
       .expect(201);
 
@@ -93,6 +103,7 @@ describe('Users (e2e)', () => {
 
     const snapshot = await request(app.getHttpServer())
       .get(`/users/${userId}`)
+      .set('Authorization', authorization)
       .expect(200);
     expect(snapshot.body).toMatchObject({
       userId,
@@ -103,16 +114,19 @@ describe('Users (e2e)', () => {
 
     const history = await request(app.getHttpServer())
       .get(`/users/${userId}/history`)
+      .set('Authorization', authorization)
       .expect(200);
     expect(history.body.map((event: { eventType: string }) => event.eventType))
       .toEqual(['USER_CREATED', 'USER_ACTIVATED', 'ROLE_ASSIGNED']);
 
     await request(app.getHttpServer())
       .delete(`/users/${userId}/roles/${role.body.role.id}`)
+      .set('Authorization', authorization)
       .send({})
       .expect(200);
     await request(app.getHttpServer())
       .post(`/users/${userId}/deactivate`)
+      .set('Authorization', authorization)
       .send({})
       .expect(201);
 
@@ -129,6 +143,7 @@ describe('Users (e2e)', () => {
   it('validates input and rejects duplicate users and assignments', async () => {
     await request(app.getHttpServer())
       .post('/users')
+      .set('Authorization', authorization)
       .send({ email: 'not-an-email' })
       .expect(400);
 
@@ -136,20 +151,24 @@ describe('Users (e2e)', () => {
     const email = `${unique('dup-user')}@example.com`;
     await request(app.getHttpServer())
       .post('/users')
+      .set('Authorization', authorization)
       .send({
         employeeNumber,
         email,
         firstName: 'Casey',
         lastName: 'Lee',
+        password: 'StrongPassword!1',
       })
       .expect(201);
     await request(app.getHttpServer())
       .post('/users')
+      .set('Authorization', authorization)
       .send({
         employeeNumber: unique('another-emp'),
         email,
         firstName: 'Jordan',
         lastName: 'Smith',
+        password: 'StrongPassword!1',
       })
       .expect(409);
   });

@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { CredentialService } from '../../auth/services/credential.service';
 import { CreatePermissionDto } from '../dto/create-permission.dto';
 import { CreateRoleDto } from '../dto/create-role.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
@@ -21,12 +22,16 @@ type TransactionClient = Prisma.TransactionClient;
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly credentials: CredentialService,
+  ) {}
 
   async createUser(dto: CreateUserDto, requestId?: string) {
     const correlationId = requestId ?? randomUUID();
     const employeeNumber = this.normalizeEmployeeNumber(dto.employeeNumber);
     const email = this.normalizeEmail(dto.email);
+    const passwordHash = await this.credentials.hashPassword(dto.password);
 
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.user.findFirst({
@@ -49,6 +54,7 @@ export class UserService {
           email,
           firstName: dto.firstName.trim(),
           lastName: dto.lastName.trim(),
+          passwordHash,
         },
       });
 
