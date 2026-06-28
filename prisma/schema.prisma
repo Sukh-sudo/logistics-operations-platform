@@ -30,6 +30,75 @@ model Terminal {
   updatedAt    DateTime          @updatedAt
   events       TerminalEvent[]
   snapshot     TerminalSnapshot?
+  originatingRoutes Route[]          @relation("RouteOriginTerminal")
+  destinationRoutes Route[]          @relation("RouteDestinationTerminal")
+  routeStops        RouteStop[]
+}
+
+model Route {
+  id                    String        @id @default(cuid())
+  routeNumber           String        @unique
+  name                  String
+  originTerminalId      Int
+  destinationTerminalId Int
+  status                RouteStatus   @default(CREATED)
+  estimatedDistance     Int           @default(0)
+  estimatedDuration     Int           @default(0)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  originTerminal        Terminal      @relation("RouteOriginTerminal", fields: [originTerminalId], references: [id])
+  destinationTerminal   Terminal      @relation("RouteDestinationTerminal", fields: [destinationTerminalId], references: [id])
+  stops                 RouteStop[]
+  events                RouteEvent[]
+  snapshot              RouteSnapshot?
+
+  @@index([originTerminalId])
+  @@index([destinationTerminalId])
+  @@index([status])
+}
+
+model RouteStop {
+  id                       String   @id @default(cuid())
+  routeId                  String
+  terminalId               Int
+  sequence                 Int
+  estimatedArrivalOffset   Int
+  estimatedDepartureOffset Int
+  route                     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  terminal                  Terminal @relation(fields: [terminalId], references: [id])
+
+  @@unique([routeId, sequence])
+  @@unique([routeId, terminalId])
+  @@index([terminalId])
+}
+
+model RouteEvent {
+  id            String         @id @default(cuid())
+  routeId       String
+  eventType     RouteEventType
+  employeeId    Int?
+  correlationId String
+  payload       Json?
+  createdAt     DateTime       @default(now())
+  route         Route          @relation(fields: [routeId], references: [id])
+
+  @@index([routeId, createdAt])
+  @@index([correlationId])
+}
+
+model RouteSnapshot {
+  id                String      @id @default(cuid())
+  routeId           String      @unique
+  currentStatus     RouteStatus @default(CREATED)
+  stopCount         Int         @default(0)
+  currentStops      Json
+  estimatedDistance Int         @default(0)
+  estimatedDuration Int         @default(0)
+  lastActivityAt    DateTime?
+  updatedAt         DateTime    @updatedAt
+  route             Route       @relation(fields: [routeId], references: [id])
+
+  @@index([currentStatus])
 }
 
 model TerminalEvent {
@@ -330,6 +399,21 @@ enum TerminalAssetType {
   PACKAGE
   CONTAINER
   TRAILER
+}
+
+enum RouteStatus {
+  CREATED
+  ACTIVE
+  RETIRED
+}
+
+enum RouteEventType {
+  ROUTE_CREATED
+  ROUTE_UPDATED
+  STOP_ADDED
+  STOP_REMOVED
+  ROUTE_ACTIVATED
+  ROUTE_RETIRED
 }
 
 enum UserStatus {

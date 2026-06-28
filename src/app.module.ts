@@ -22,6 +22,7 @@ import { TerminalModule } from './modules/terminals/terminal.module';
 import { UserModule } from './modules/users/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuthorizationModule } from './modules/authorization/authorization.module';
+import { RouteModule } from './modules/routes/route.module';
 
 @Module({
   imports: [
@@ -51,6 +52,8 @@ import { AuthorizationModule } from './modules/authorization/authorization.modul
     AuthModule,
 
     AuthorizationModule,
+
+    RouteModule,
   ],
 })
 export class AppModule implements NestModule {
