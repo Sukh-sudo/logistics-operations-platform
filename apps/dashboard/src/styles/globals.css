@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { @apply border-slate-200; }
+  body { @apply m-0 bg-canvas font-sans text-ink antialiased; }
+  button, input { font: inherit; }
+  a { @apply text-inherit no-underline; }
+}
+
+@layer components {
+  .focus-ring { @apply focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2; }
+}

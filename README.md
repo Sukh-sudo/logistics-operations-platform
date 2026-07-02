@@ -1,103 +1,450 @@
-<<<<<<< HEAD
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Logistics Operations Platform
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> An enterprise-grade, event-driven logistics operations platform built with NestJS, Prisma, PostgreSQL, and TypeScript.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Overview
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+The Logistics Operations Platform is a backend system designed to model real-world parcel and freight logistics operations. It provides a scalable, event-driven architecture for tracking packages, containers, trailers, terminals, routes, shipments, and operational workflows.
 
-## Project setup
+The project is intentionally designed as a portfolio-quality enterprise application that demonstrates modern backend architecture, domain-driven design principles, event sourcing concepts, CQRS-inspired read/write separation, transactional consistency, and production-ready development practices.
 
-```bash
-$ pnpm install
+The long-term vision is to build a complete logistics platform capable of supporting distribution centers, cross-dock facilities, transportation networks, and operational dashboards.
+
+---
+
+# Current Status
+
+**Project Phase:** Core Logistics Engine
+
+### Implemented
+
+- Package lifecycle engine
+- Package event sourcing
+- Package snapshots
+- Package location tracking
+- Package history
+- Container management
+- Package → Container workflows
+- Trailer management
+- Container → Trailer workflows
+- Loose Package → Trailer workflows
+- Operational dashboard
+- Unified search
+- Health monitoring
+- Swagger API documentation
+- Correlation IDs
+- Integration testing
+- PostgreSQL persistence
+- Prisma ORM
+
+### Scaffolded
+
+The following modules already exist in the project structure and will be implemented in future development:
+
+- Users
+- Authentication
+- Analytics
+- Terminals
+- Routes
+- Shipments
+
+---
+
+# Business Domain
+
+The system models the operational hierarchy commonly found in transportation and parcel logistics.
+
+```
+Terminal
+│
+├── Routes
+│
+├── Trailers
+│     │
+│     ├── Containers
+│     │      │
+│     │      └── Packages
+│     │
+│     └── Loose Packages
+│
+├── Shipments
+│
+└── Employees
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ pnpm run start
+# Design Principles
 
-# watch mode
-$ pnpm run start:dev
+The platform follows several architectural principles.
 
-# production mode
-$ pnpm run start:prod
+- Event-driven design
+- Immutable operational history
+- Snapshot read models
+- Modular architecture
+- Transactional consistency
+- Strong domain boundaries
+- Scalable module design
+- Comprehensive integration testing
+
+---
+
+# Technology Stack
+
+| Layer | Technology |
+|----------|------------|
+| Runtime | Node.js |
+| Language | TypeScript |
+| Framework | NestJS |
+| ORM | Prisma |
+| Database | PostgreSQL |
+| Validation | class-validator |
+| API Docs | Swagger |
+| Testing | Jest + Supertest |
+| Package Manager | pnpm |
+| Messaging | Kafka (planned) |
+| Containerization | Docker (planned) |
+
+---
+
+# Current Modules
+
+```
+src/modules
+
+analytics/
+auth/
+containers/
+dashboard/
+health/
+packages/
+routes/
+search/
+shipments/
+terminals/
+trailers/
+users/
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ pnpm run test
+# Architecture
 
-# e2e tests
-$ pnpm run test:e2e
+The application follows a layered architecture.
 
-# test coverage
-$ pnpm run test:cov
+```
+HTTP Request
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Prisma Transaction
+
+↓
+
+Database
+
+├── Event Tables
+
+├── Snapshot Tables
+
+└── History Tables
+
+↓
+
+HTTP Response
 ```
 
-## Deployment
+Every write operation updates:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- Immutable event log
+- Snapshot model
+- Relationship history (where applicable)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+---
+
+# Core Workflows
+
+Currently implemented workflows include:
+
+### Packages
+
+- Receive package
+- Sort package
+- Load package into container
+- Unload package from container
+- Load package directly into trailer
+- Unload package from trailer
+- Query package location
+- View package history
+
+### Containers
+
+- Create container
+- Load packages
+- Unload packages
+- Load container into trailer
+- Unload container from trailer
+- Query container
+- View container history
+
+### Trailers
+
+- Create trailer
+- Load containers
+- Unload containers
+- Load loose packages
+- Unload loose packages
+- Query trailer
+- View trailer history
+- View trailer manifest
+
+---
+
+# Planned Modules
+
+The long-term platform includes:
+
+## Users
+
+Authentication
+
+Authorization
+
+Roles
+
+Permissions
+
+Employees
+
+---
+
+## Terminals
+
+Receiving
+
+Sorting
+
+Dispatch
+
+Arrival
+
+Capacity Management
+
+Dock Management
+
+---
+
+## Routes
+
+Origin
+
+Destination
+
+Scheduling
+
+Departure
+
+Arrival
+
+Driver Assignment
+
+Trailer Assignment
+
+---
+
+## Shipments
+
+Shipment Creation
+
+Package Assignment
+
+Customer Tracking
+
+Delivery Confirmation
+
+---
+
+## Analytics
+
+Operational KPIs
+
+Terminal Throughput
+
+Trailer Utilization
+
+Container Utilization
+
+Forecasting
+
+---
+
+# Development
+
+## Install Dependencies
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm install
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## Generate Prisma Client
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+pnpm prisma generate
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+---
 
-## Support
+## Apply Database Migrations
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+pnpm prisma migrate dev
+```
 
-## Stay in touch
+---
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Start Development Server
 
-## License
+```bash
+pnpm start:dev
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-=======
-# logistics-operations-platform
-Event-Driven transport operations intelligence platform
->>>>>>> 0d1b1f9365e193d445337a34e510cd5ca3c58d6f
+---
+
+## Build
+
+```bash
+pnpm build
+```
+
+---
+
+## Run Tests
+
+```bash
+pnpm test
+```
+
+---
+
+## Run Integration Tests
+
+```bash
+pnpm test:e2e
+```
+
+---
+
+# API Documentation
+
+Swagger UI
+
+```
+http://localhost:3000/api/docs
+```
+
+---
+
+# Repository Structure
+
+```
+apps/
+    backend/
+
+docs/
+
+README.md
+
+PROJECT_SPEC.md
+```
+
+---
+
+# Documentation
+
+Complete engineering documentation is maintained under:
+
+```
+docs/
+```
+
+Documentation covers:
+
+- System Architecture
+- Database Design
+- Event Sourcing
+- Module Design
+- API Reference
+- Business Rules
+- Testing Strategy
+- Production Readiness
+- Development Roadmap
+- AI Development Guide
+
+---
+
+# Project Goals
+
+This repository is intended to demonstrate:
+
+- Enterprise backend architecture
+- Domain-driven design
+- Event-driven systems
+- Logistics operations modeling
+- Modern API development
+- Production-ready coding practices
+- Scalable software architecture
+
+---
+
+# Future Roadmap
+
+Phase 1
+
+✅ Core Logistics Engine
+
+---
+
+Phase 2
+
+- Users
+- Authentication
+- Terminals
+- Routes
+- Shipments
+
+---
+
+Phase 3
+
+- Kafka
+- Notifications
+- Analytics
+- Reporting
+
+---
+
+Phase 4
+
+- React Dashboard
+- Mobile Scanner
+- GIS Integration
+- Machine Learning
+- Predictive Analytics
+
+---
+
+# License
+
+This project is intended for educational, portfolio, and professional development purposes.
