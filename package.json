@@ -4,11 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "start:dev": "pnpm --filter backend start:dev",
+    "test": "turbo run test",
+    "test:e2e": "pnpm --filter backend test:e2e",
+    "prisma": "pnpm --filter backend exec prisma"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "packageManager": "pnpm@11.2.2",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
