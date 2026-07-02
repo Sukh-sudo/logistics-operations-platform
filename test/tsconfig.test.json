@@ -5,11 +5,12 @@
     // Explicit root directory for tests
     "rootDir": "../",
 
-    // Silence TS6 deprecation warnings
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
 
     // Required for Jest transpilation
     "module": "commonjs",
+    "moduleResolution": "node",
+    "resolvePackageJsonExports": false,
 
     // Allow Jest globals/types
     "types": ["jest", "node"]

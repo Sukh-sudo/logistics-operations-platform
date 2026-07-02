@@ -17,6 +17,8 @@ import { CredentialService } from '../../auth/services/credential.service';
 import { CreatePermissionDto } from '../dto/create-permission.dto';
 import { CreateRoleDto } from '../dto/create-role.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
+import { BootstrapAdminDto } from '../dto/bootstrap-admin.dto';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -26,6 +28,58 @@ export class UserService {
     private readonly prisma: PrismaService,
     private readonly credentials: CredentialService,
   ) {}
+
+  async bootstrapAdmin(dto: BootstrapAdminDto, requestId?: string) {
+    const configuredSecret = process.env.BOOTSTRAP_ADMIN_SECRET;
+    if (!configuredSecret || dto.bootstrapSecret !== configuredSecret) {
+      throw new BadRequestException('Invalid bootstrap secret');
+    }
+    const correlationId = requestId ?? randomUUID();
+    const employeeNumber = this.normalizeEmployeeNumber(dto.employeeNumber);
+    const email = this.normalizeEmail(dto.email);
+    const passwordHash = await this.credentials.hashPassword(dto.password);
+    const permissionCodes = Object.values(PERMISSIONS).sort();
+
+    return this.prisma.$transaction(async (tx) => {
+      if (await tx.user.findFirst({ where: { OR: [{ employeeNumber }, { email }] } })) {
+        throw new ConflictException('Administrator identity already exists');
+      }
+      const role = await tx.role.upsert({
+        where: { name: 'ADMIN' },
+        update: { description: 'Full platform administrator' },
+        create: { name: 'ADMIN', description: 'Full platform administrator' },
+      });
+      const permissions: Array<{ id: string; code: string }> = [];
+      for (const code of permissionCodes) {
+        permissions.push(await tx.permission.upsert({
+          where: { code }, update: {}, create: { code, description: `Allows ${code}` },
+        }));
+      }
+      for (const permission of permissions) {
+        await tx.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+          update: {}, create: { roleId: role.id, permissionId: permission.id },
+        });
+      }
+      const user = await tx.user.create({
+        data: { employeeNumber, email, firstName: dto.firstName.trim(), lastName: dto.lastName.trim(), passwordHash },
+      });
+      await tx.userRole.create({ data: { userId: user.id, roleId: role.id } });
+      const created = await tx.userEvent.create({
+        data: { userId: user.id, eventType: UserEventType.USER_CREATED, correlationId, payload: { employeeNumber, email } },
+      });
+      await tx.userEvent.create({
+        data: { userId: user.id, eventType: UserEventType.ROLE_ASSIGNED, actorUserId: user.id, correlationId, payload: { roleId: role.id, roleName: role.name } },
+      });
+      const activated = await tx.userEvent.create({
+        data: { userId: user.id, eventType: UserEventType.USER_ACTIVATED, actorUserId: user.id, correlationId },
+      });
+      const snapshot = await tx.userSnapshot.create({
+        data: { userId: user.id, employeeNumber, email, firstName: user.firstName, lastName: user.lastName, currentStatus: UserStatus.ACTIVE, roleNames: [role.name], permissions: permissionCodes, lastActivityAt: activated.createdAt },
+      });
+      return { user: { id: user.id, employeeNumber, email, firstName: user.firstName, lastName: user.lastName }, role: role.name, permissions: permissionCodes, snapshot, eventsCreated: 3, createdAt: created.createdAt };
+    });
+  }
 
   async createUser(dto: CreateUserDto, requestId?: string) {
     const correlationId = requestId ?? randomUUID();

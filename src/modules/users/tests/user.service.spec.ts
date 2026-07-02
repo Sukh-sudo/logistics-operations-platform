@@ -27,10 +27,12 @@ describe('UserService', () => {
     role: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      upsert: jest.fn(),
     },
     permission: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      upsert: jest.fn(),
     },
     userRole: {
       findUnique: jest.fn(),
@@ -41,6 +43,7 @@ describe('UserService', () => {
     rolePermission: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      upsert: jest.fn(),
     },
     identityEvent: {
       create: jest.fn(),
@@ -113,6 +116,26 @@ describe('UserService', () => {
       }),
     });
     expect(result.events).toHaveLength(1);
+  });
+
+  it('bootstraps an active administrator with every permission atomically', async () => {
+    process.env.BOOTSTRAP_ADMIN_SECRET = 'test-bootstrap-secret';
+    const createdAt = new Date();
+    tx.user.findFirst.mockResolvedValue(null);
+    tx.role.upsert.mockResolvedValue({ id: 'role-admin', name: 'ADMIN' });
+    tx.permission.upsert.mockImplementation(({ where }) => Promise.resolve({ id: `permission-${where.code}`, code: where.code }));
+    tx.rolePermission.upsert.mockResolvedValue({});
+    tx.user.create.mockResolvedValue({ id: 'admin-1', employeeNumber: 'ADMIN-1', email: 'admin@example.com', firstName: 'System', lastName: 'Admin' });
+    tx.userRole.create.mockResolvedValue({});
+    tx.userEvent.create.mockResolvedValue({ id: 'event-1', createdAt });
+    tx.userSnapshot.create.mockImplementation(({ data }) => Promise.resolve(data));
+
+    const result = await service.bootstrapAdmin({ bootstrapSecret: 'test-bootstrap-secret', employeeNumber: 'admin-1', email: 'ADMIN@example.com', firstName: 'System', lastName: 'Admin', password: 'StrongPassword!1' });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.rolePermission.upsert).toHaveBeenCalledTimes(14);
+    expect(tx.userEvent.create).toHaveBeenCalledTimes(3);
+    expect(result.snapshot).toMatchObject({ currentStatus: UserStatus.ACTIVE, roleNames: ['ADMIN'] });
   });
 
   it('rejects duplicate user identity values', async () => {

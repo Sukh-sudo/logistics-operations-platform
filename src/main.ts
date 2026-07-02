@@ -15,6 +15,13 @@ import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter'
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://127.0.0.1:5173')
+      .split(',')
+      .map((origin) => origin.trim()),
+    credentials: true,
+  });
+
   // Enable global DTO validation
   app.useGlobalPipes(
     new ValidationPipe({
