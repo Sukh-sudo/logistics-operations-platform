@@ -13,6 +13,7 @@ import type { RequestWithId } from '../../../common/middleware/request-id.middle
 import { CreatePermissionDto } from '../dto/create-permission.dto';
 import { CreateRoleDto } from '../dto/create-role.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
+import { AssignTerminalDto } from '../dto/assign-terminal.dto';
 import {
   AssignPermissionDto,
   AssignRoleDto,
@@ -73,6 +74,21 @@ export class UserController {
   ) {
     return this.userService.deactivateUser(
       id,
+      dto.actorUserId,
+      request.requestId,
+    );
+  }
+
+  @Post('users/:id/assign-terminal')
+  @Permissions(PERMISSIONS.USER_MANAGE)
+  assignTerminal(
+    @Param('id') id: string,
+    @Body() dto: AssignTerminalDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.userService.assignTerminal(
+      id,
+      dto.terminalId,
       dto.actorUserId,
       request.requestId,
     );

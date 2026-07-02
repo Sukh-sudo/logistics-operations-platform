@@ -62,3 +62,5 @@ dist
 coverage
 .env
 >>>>>>> 0d1b1f9365e193d445337a34e510cd5ca3c58d6f
+# Documentation (local design documents)
+docs/

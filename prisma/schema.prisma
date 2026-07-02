@@ -8,53 +8,189 @@ datasource db {
 }
 
 model PackageSnapshot {
-  id                 String         @id @default(cuid())
-  trackingNumber     String         @unique
+  id                 String            @id @default(cuid())
+  trackingNumber     String            @unique
   currentStatus      PackageStatus
   currentTerminalId  Int?
-  updatedAt          DateTime       @updatedAt
+  updatedAt          DateTime          @updatedAt
   currentContainerId String?
   currentTrailerId   String?
   events             PackageEvent[]
+  shipmentPackages   ShipmentPackage[]
 }
 
 model Terminal {
-  id           Int               @id @default(autoincrement())
-  terminalCode String            @unique
-  name         String
-  city         String
-  province     String
-  country      String
-  timezone     String
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  events       TerminalEvent[]
-  snapshot     TerminalSnapshot?
-  originatingRoutes Route[]          @relation("RouteOriginTerminal")
-  destinationRoutes Route[]          @relation("RouteDestinationTerminal")
-  routeStops        RouteStop[]
+  id                   Int               @id @default(autoincrement())
+  terminalCode         String            @unique
+  name                 String
+  city                 String
+  province             String
+  country              String
+  timezone             String
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  events               TerminalEvent[]
+  snapshot             TerminalSnapshot?
+  originatingRoutes    Route[]           @relation("RouteOriginTerminal")
+  destinationRoutes    Route[]           @relation("RouteDestinationTerminal")
+  routeStops           RouteStop[]
+  tripStops            TripStop[]
+  originatingShipments Shipment[]        @relation("ShipmentOriginTerminal")
+  destinationShipments Shipment[]        @relation("ShipmentDestinationTerminal")
+  primaryUsers         User[]
 }
 
 model Route {
-  id                    String        @id @default(cuid())
-  routeNumber           String        @unique
+  id                    String         @id @default(cuid())
+  routeNumber           String         @unique
   name                  String
   originTerminalId      Int
   destinationTerminalId Int
-  status                RouteStatus   @default(CREATED)
-  estimatedDistance     Int           @default(0)
-  estimatedDuration     Int           @default(0)
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
-  originTerminal        Terminal      @relation("RouteOriginTerminal", fields: [originTerminalId], references: [id])
-  destinationTerminal   Terminal      @relation("RouteDestinationTerminal", fields: [destinationTerminalId], references: [id])
+  status                RouteStatus    @default(CREATED)
+  estimatedDistance     Int            @default(0)
+  estimatedDuration     Int            @default(0)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  originTerminal        Terminal       @relation("RouteOriginTerminal", fields: [originTerminalId], references: [id])
+  destinationTerminal   Terminal       @relation("RouteDestinationTerminal", fields: [destinationTerminalId], references: [id])
   stops                 RouteStop[]
   events                RouteEvent[]
   snapshot              RouteSnapshot?
+  trips                 Trip[]
 
   @@index([originTerminalId])
   @@index([destinationTerminalId])
   @@index([status])
+}
+
+model Trip {
+  id                    String        @id @default(cuid())
+  tripNumber            String        @unique
+  routeId               String
+  equipmentAssignmentId String?
+  status                TripStatus    @default(CREATED)
+  plannedDeparture      DateTime
+  actualDeparture       DateTime?
+  plannedArrival        DateTime
+  actualArrival         DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  route                 Route         @relation(fields: [routeId], references: [id])
+  stops                 TripStop[]
+  events                TripEvent[]
+  snapshot              TripSnapshot?
+
+  @@index([routeId])
+  @@index([status])
+}
+
+model TripStop {
+  id               String         @id @default(cuid())
+  tripId           String
+  terminalId       Int
+  sequence         Int
+  plannedArrival   DateTime
+  actualArrival    DateTime?
+  plannedDeparture DateTime
+  actualDeparture  DateTime?
+  status           TripStopStatus @default(PENDING)
+  delayMinutes     Int            @default(0)
+  notes            String?
+  trip             Trip           @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  terminal         Terminal       @relation(fields: [terminalId], references: [id])
+
+  @@unique([tripId, sequence])
+  @@index([terminalId])
+}
+
+model TripEvent {
+  id            String        @id @default(cuid())
+  tripId        String
+  eventType     TripEventType
+  correlationId String
+  payload       Json?
+  createdAt     DateTime      @default(now())
+  trip          Trip          @relation(fields: [tripId], references: [id])
+
+  @@index([tripId, createdAt])
+  @@index([correlationId])
+}
+
+model TripSnapshot {
+  id                String     @id @default(cuid())
+  tripId            String     @unique
+  currentStatus     TripStatus @default(CREATED)
+  currentStopId     String?
+  nextStopId        String?
+  currentTerminalId Int?
+  completedStops    Int        @default(0)
+  totalStops        Int        @default(0)
+  progressPercent   Int        @default(0)
+  delayMinutes      Int        @default(0)
+  lastActivityAt    DateTime?
+  updatedAt         DateTime   @updatedAt
+  trip              Trip       @relation(fields: [tripId], references: [id])
+
+  @@index([currentStatus])
+}
+
+model Shipment {
+  id                    String            @id @default(cuid())
+  shipmentNumber        String            @unique
+  referenceNumber       String?
+  status                ShipmentStatus    @default(CREATED)
+  originTerminalId      Int
+  destinationTerminalId Int
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  originTerminal        Terminal          @relation("ShipmentOriginTerminal", fields: [originTerminalId], references: [id])
+  destinationTerminal   Terminal          @relation("ShipmentDestinationTerminal", fields: [destinationTerminalId], references: [id])
+  packages              ShipmentPackage[]
+  events                ShipmentEvent[]
+  snapshot              ShipmentSnapshot?
+
+  @@index([originTerminalId])
+  @@index([destinationTerminalId])
+  @@index([status])
+}
+
+model ShipmentPackage {
+  shipmentId String
+  packageId  String
+  assignedAt DateTime        @default(now())
+  shipment   Shipment        @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  package    PackageSnapshot @relation(fields: [packageId], references: [id])
+
+  @@id([shipmentId, packageId])
+  @@unique([packageId])
+}
+
+model ShipmentEvent {
+  id            String            @id @default(cuid())
+  shipmentId    String
+  eventType     ShipmentEventType
+  correlationId String
+  payload       Json?
+  createdAt     DateTime          @default(now())
+  shipment      Shipment          @relation(fields: [shipmentId], references: [id])
+
+  @@index([shipmentId, createdAt])
+  @@index([correlationId])
+}
+
+model ShipmentSnapshot {
+  id                String         @id @default(cuid())
+  shipmentId        String         @unique
+  currentStatus     ShipmentStatus @default(CREATED)
+  packageCount      Int            @default(0)
+  deliveredPackages Int            @default(0)
+  remainingPackages Int            @default(0)
+  progressPercent   Int            @default(0)
+  lastActivityAt    DateTime?
+  updatedAt         DateTime       @updatedAt
+  shipment          Shipment       @relation(fields: [shipmentId], references: [id])
+
+  @@index([currentStatus])
 }
 
 model RouteStop {
@@ -64,8 +200,8 @@ model RouteStop {
   sequence                 Int
   estimatedArrivalOffset   Int
   estimatedDepartureOffset Int
-  route                     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  terminal                  Terminal @relation(fields: [terminalId], references: [id])
+  route                    Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  terminal                 Terminal @relation(fields: [terminalId], references: [id])
 
   @@unique([routeId, sequence])
   @@unique([routeId, terminalId])
@@ -131,18 +267,22 @@ model TerminalSnapshot {
 }
 
 model User {
-  id             String        @id @default(cuid())
-  employeeNumber String        @unique
-  email          String        @unique
-  firstName      String
-  lastName       String
-  passwordHash   String?
-  tokenVersion   Int           @default(0)
-  createdAt      DateTime      @default(now())
-  events         UserEvent[]
-  snapshot       UserSnapshot?
-  roles          UserRole[]
-  refreshTokens  RefreshToken[]
+  id                String         @id @default(cuid())
+  employeeNumber    String         @unique
+  email             String         @unique
+  firstName         String
+  lastName          String
+  passwordHash      String?
+  tokenVersion      Int            @default(0)
+  createdAt         DateTime       @default(now())
+  events            UserEvent[]
+  snapshot          UserSnapshot?
+  roles             UserRole[]
+  refreshTokens     RefreshToken[]
+  primaryTerminalId Int?
+  primaryTerminal   Terminal?      @relation(fields: [primaryTerminalId], references: [id])
+
+  @@index([primaryTerminalId])
 }
 
 model UserEvent {
@@ -161,19 +301,20 @@ model UserEvent {
 }
 
 model UserSnapshot {
-  id             String     @id @default(cuid())
-  userId         String     @unique
-  employeeNumber String
-  email          String
-  firstName      String
-  lastName       String
-  currentStatus  UserStatus @default(INACTIVE)
-  roleNames      String[]   @default([])
-  permissions    String[]   @default([])
-  lastLoginAt    DateTime?
-  lastActivityAt DateTime?
-  updatedAt      DateTime   @updatedAt
-  user           User       @relation(fields: [userId], references: [id])
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  employeeNumber    String
+  email             String
+  firstName         String
+  lastName          String
+  currentStatus     UserStatus @default(INACTIVE)
+  currentTerminalId Int?
+  roleNames         String[]   @default([])
+  permissions       String[]   @default([])
+  lastLoginAt       DateTime?
+  lastActivityAt    DateTime?
+  updatedAt         DateTime   @updatedAt
+  user              User       @relation(fields: [userId], references: [id])
 
   @@index([email])
   @@index([employeeNumber])
@@ -416,6 +557,49 @@ enum RouteEventType {
   ROUTE_RETIRED
 }
 
+enum TripStatus {
+  CREATED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TripStopStatus {
+  PENDING
+  ARRIVED
+  DEPARTED
+}
+
+enum TripEventType {
+  TRIP_CREATED
+  TRIP_UPDATED
+  TRIP_STARTED
+  STOP_ARRIVED
+  STOP_DEPARTED
+  STOP_DELAYED
+  TRIP_COMPLETED
+  TRIP_CANCELLED
+}
+
+enum ShipmentStatus {
+  CREATED
+  PACKAGES_ASSIGNED
+  IN_TRANSIT
+  PARTIALLY_DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum ShipmentEventType {
+  SHIPMENT_CREATED
+  SHIPMENT_UPDATED
+  PACKAGE_ASSIGNED
+  PACKAGE_REMOVED
+  SHIPMENT_IN_TRANSIT
+  SHIPMENT_COMPLETED
+  SHIPMENT_CANCELLED
+}
+
 enum UserStatus {
   INACTIVE
   ACTIVE
@@ -431,6 +615,7 @@ enum UserEventType {
   REFRESH_TOKEN_ROTATED
   USER_LOGGED_OUT
   PASSWORD_CHANGED
+  TERMINAL_ASSIGNED
 }
 
 enum IdentityAggregateType {

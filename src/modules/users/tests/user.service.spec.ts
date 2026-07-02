@@ -14,6 +14,7 @@ describe('UserService', () => {
     user: {
       findFirst: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
     userEvent: {
       create: jest.fn(),
@@ -43,6 +44,9 @@ describe('UserService', () => {
     },
     identityEvent: {
       create: jest.fn(),
+    },
+    terminal: {
+      findUnique: jest.fn(),
     },
   };
   const prisma = {
@@ -170,6 +174,18 @@ describe('UserService', () => {
       BadRequestException,
     );
     expect(tx.userEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('assigns a primary terminal with an event and snapshot update', async () => {
+    const createdAt = new Date();
+    tx.userSnapshot.findUnique.mockResolvedValue({ userId: 'user-1', currentTerminalId: null });
+    tx.terminal.findUnique.mockResolvedValue({ id: 7, terminalCode: 'YYC' });
+    tx.userEvent.create.mockResolvedValue({ eventType: UserEventType.TERMINAL_ASSIGNED, createdAt });
+    tx.userSnapshot.update.mockResolvedValue({ userId: 'user-1', currentTerminalId: 7 });
+    const result = await service.assignTerminal('user-1', 7);
+    expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'user-1' }, data: { primaryTerminalId: 7 } });
+    expect(tx.userEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: UserEventType.TERMINAL_ASSIGNED }) });
+    expect(result.snapshot.currentTerminalId).toBe(7);
   });
 
   it('assigns a role and derives additive permissions into the snapshot', async () => {

@@ -163,6 +163,38 @@ export class UserService {
     );
   }
 
+  async assignTerminal(
+    userId: string,
+    terminalId: number,
+    actorUserId?: string,
+    requestId?: string,
+  ) {
+    const correlationId = requestId ?? randomUUID();
+    return this.prisma.$transaction(async (tx) => {
+      const current = await this.requireUserSnapshot(tx, userId);
+      const terminal = await tx.terminal.findUnique({ where: { id: terminalId } });
+      if (!terminal) throw new NotFoundException('Terminal not found');
+      if (current.currentTerminalId === terminalId) {
+        throw new ConflictException('Terminal is already assigned to this user');
+      }
+      await tx.user.update({ where: { id: userId }, data: { primaryTerminalId: terminalId } });
+      const event = await tx.userEvent.create({
+        data: {
+          userId,
+          eventType: UserEventType.TERMINAL_ASSIGNED,
+          actorUserId,
+          correlationId,
+          payload: { terminalId, terminalCode: terminal.terminalCode },
+        },
+      });
+      const snapshot = await tx.userSnapshot.update({
+        where: { userId },
+        data: { currentTerminalId: terminalId, lastActivityAt: event.createdAt },
+      });
+      return { snapshot, terminal, event };
+    });
+  }
+
   async assignRole(
     userId: string,
     roleId: string,

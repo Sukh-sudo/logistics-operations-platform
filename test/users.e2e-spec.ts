@@ -80,6 +80,18 @@ describe('Users (e2e)', () => {
     expect(created.body.snapshot.currentStatus).toBe('INACTIVE');
     expect(created.body.events[0].eventType).toBe('USER_CREATED');
 
+    const terminal = await request(app.getHttpServer())
+      .post('/terminals')
+      .send({ terminalCode: unique('UT'), name: 'User terminal', city: 'Calgary', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton' })
+      .expect(201);
+    const terminalAssignment = await request(app.getHttpServer())
+      .post(`/users/${userId}/assign-terminal`)
+      .set('Authorization', authorization)
+      .send({ terminalId: terminal.body.terminal.id })
+      .expect(201);
+    expect(terminalAssignment.body.snapshot.currentTerminalId).toBe(terminal.body.terminal.id);
+    expect(terminalAssignment.body.event.eventType).toBe('TERMINAL_ASSIGNED');
+
     await request(app.getHttpServer())
       .post(`/users/${userId}/activate`)
       .set('Authorization', authorization)
@@ -117,7 +129,7 @@ describe('Users (e2e)', () => {
       .set('Authorization', authorization)
       .expect(200);
     expect(history.body.map((event: { eventType: string }) => event.eventType))
-      .toEqual(['USER_CREATED', 'USER_ACTIVATED', 'ROLE_ASSIGNED']);
+      .toEqual(['USER_CREATED', 'TERMINAL_ASSIGNED', 'USER_ACTIVATED', 'ROLE_ASSIGNED']);
 
     await request(app.getHttpServer())
       .delete(`/users/${userId}/roles/${role.body.role.id}`)
