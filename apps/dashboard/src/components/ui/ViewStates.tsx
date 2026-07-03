@@ -1,0 +1,4 @@
+import { AlertCircle, Inbox } from 'lucide-react';
+export function LoadingState() { return <div className="grid min-h-64 place-items-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600"/></div>; }
+export function ErrorState({ message = 'We could not load this workspace.' }: { message?: string }) { return <div className="grid min-h-64 place-items-center rounded-2xl border bg-white text-center"><div><AlertCircle className="mx-auto h-8 w-8 text-rose-500"/><p className="mt-3 font-medium text-slate-800">{message}</p><p className="mt-1 text-sm text-slate-500">Check the API connection and try again.</p></div></div>; }
+export function EmptyState({ label }: { label: string }) { return <div className="py-12 text-center text-slate-500"><Inbox className="mx-auto mb-3 h-7 w-7 text-slate-300"/>{label}</div>; }

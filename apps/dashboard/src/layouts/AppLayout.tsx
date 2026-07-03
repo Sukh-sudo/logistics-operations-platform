@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Boxes, Container, HeartPulse, Home, LogOut, PackageSearch, Search, Truck } from 'lucide-react';
+import { Activity, BarChart3, Boxes, Container, HeartPulse, Home, LogOut, PackageSearch, Route, Search, Truck } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -6,10 +6,11 @@ const links = [
   { to: '/', label: 'Home', icon: Home }, { to: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { to: '/search', label: 'Global search', icon: Search }, { to: '/packages', label: 'Packages', icon: PackageSearch },
   { to: '/containers', label: 'Containers', icon: Container }, { to: '/trailers', label: 'Trailers', icon: Truck },
+  { to: '/transportation', label: 'Transportation', icon: Route },
   { to: '/events', label: 'Recent events', icon: Activity }, { to: '/analytics', label: 'Analytics', icon: Boxes },
   { to: '/health', label: 'System health', icon: HeartPulse },
 ];
-const titles: Record<string, string> = { '/': 'Operations hub', '/dashboard': 'Operational dashboard', '/search': 'Global search', '/packages': 'Package visibility', '/containers': 'Container visibility', '/trailers': 'Trailer visibility', '/events': 'Recent events', '/analytics': 'Analytics', '/health': 'System health' };
+const titles: Record<string, string> = { '/': 'Operations hub', '/dashboard': 'Operational dashboard', '/transportation': 'Transportation network', '/search': 'Global search', '/packages': 'Package visibility', '/containers': 'Container visibility', '/trailers': 'Trailer visibility', '/events': 'Recent events', '/analytics': 'Analytics', '/health': 'System health' };
 
 export function AppLayout() {
   const { user, logout } = useAuth(); const navigate = useNavigate(); const location = useLocation();
