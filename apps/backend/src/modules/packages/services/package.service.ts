@@ -6,6 +6,7 @@ import { KafkaService } from '../../../infrastructure/kafka/kafka.service';
 import { CreatePackageEventDto } from '../dto/create-package-event.dto';
 import { AppLogger } from '../../../common/utils/logger';
 import { PackageTransitionValidator } from '../validators/package-transition.validator';
+import { packageTypeFromIdentifier } from '../../../common/domain/asset-identifiers';
 
 @Injectable()
 export class PackageService {
@@ -57,6 +58,7 @@ export class PackageService {
       snapshot = await tx.packageSnapshot.create({
         data: {
           trackingNumber: dto.trackingNumber,
+          packageType: packageTypeFromIdentifier(dto.trackingNumber),
           currentStatus: PackageStatus.RECEIVED,
         },
       });
@@ -76,6 +78,9 @@ export class PackageService {
         eventType: dto.eventType,
         terminalId: dto.terminalId,
         employeeId: dto.employeeId,
+        metadata: dto.eventType === PackageEventType.PACKAGE_RECEIVED
+          ? { packageType: snapshot.packageType }
+          : undefined,
       },
     });
 

@@ -10,6 +10,7 @@ datasource db {
 model PackageSnapshot {
   id                 String            @id @default(cuid())
   trackingNumber     String            @unique
+  packageType        PackageType
   currentStatus      PackageStatus
   currentTerminalId  Int?
   updatedAt          DateTime          @updatedAt
@@ -402,6 +403,7 @@ model PackageEvent {
 model ContainerSnapshot {
   id                String           @id @default(cuid())
   containerBarcode  String           @unique
+  packageType       PackageType
   currentStatus     ContainerStatus
   currentTrailerId  String?
   currentTerminalId Int?
@@ -472,6 +474,13 @@ enum PackageStatus {
   ARRIVED
   OUT_FOR_DELIVERY
   DELIVERED
+}
+
+enum PackageType {
+  MAIL
+  CONVEYABLE
+  NON_CONVEYABLE
+  DANGEROUS_GOODS
 }
 
 enum PackageEventType {

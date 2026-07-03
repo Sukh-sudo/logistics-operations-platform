@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PackageStatus, PrismaClient } from '@prisma/client';
 import request from 'supertest';
+import { packageIdentifier } from './support/asset-identifiers';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 
@@ -12,7 +13,7 @@ describe('Shipments (e2e)', () => {
   let sequence = 0;
   const unique = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${sequence++}`;
   const terminal = async () => (await request(app.getHttpServer()).post('/terminals').send({ terminalCode: unique('ST'), name: 'Shipment terminal', city: 'Edmonton', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton' }).expect(201)).body.terminal.id as number;
-  const pkg = async () => { const trackingNumber = unique('PKG'); await request(app.getHttpServer()).post('/package-events').send({ trackingNumber, eventType: 'PACKAGE_RECEIVED' }).expect(201); return trackingNumber; };
+  const pkg = async () => { const trackingNumber = packageIdentifier(); await request(app.getHttpServer()).post('/package-events').send({ trackingNumber, eventType: 'PACKAGE_RECEIVED' }).expect(201); return trackingNumber; };
 
   beforeAll(async () => {
     const fixture = await Test.createTestingModule({ imports: [AppModule] }).compile();

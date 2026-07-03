@@ -4,6 +4,7 @@ import { LoadPackageDto } from '../dto/load-package.dto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CreateContainerDto } from '../dto/create-container.dto';
 import {Injectable, ConflictException, BadRequestException, NotFoundException,} from '@nestjs/common';
+import { packageTypeFromIdentifier } from '../../../common/domain/asset-identifiers';
 
 @Injectable()
 export class ContainerService {
@@ -34,6 +35,7 @@ export class ContainerService {
         await tx.containerSnapshot.create({
           data: {
             containerBarcode: dto.containerBarcode,
+            packageType: packageTypeFromIdentifier(dto.containerBarcode),
             currentStatus: ContainerStatus.OPEN,
           },
         });
@@ -45,6 +47,9 @@ export class ContainerService {
             containerId: snapshot.id,
             eventType:
               ContainerEventType.CONTAINER_CREATED,
+            metadata: {
+              packageType: packageTypeFromIdentifier(dto.containerBarcode),
+            },
           },
         });
 
@@ -91,6 +96,12 @@ export class ContainerService {
         throw new BadRequestException(
             'Package already assigned to a container',
         );
+        }
+
+        if (packageSnapshot.packageType !== container.packageType) {
+          throw new BadRequestException(
+            `Package type ${packageSnapshot.packageType} is not accepted by this ${container.packageType} container`,
+          );
         }
 
         await tx.packageEvent.create({

@@ -1,3 +1,4 @@
+import { packageIdentifier } from './support/asset-identifiers';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 
@@ -40,7 +41,7 @@ describe('Package Events (e2e)', () => {
 
   it('should create package event successfully', async () => {
     const payload = {
-      trackingNumber: `PKG-TEST-${Date.now()}`,
+      trackingNumber: packageIdentifier(),
       eventType: 'PACKAGE_RECEIVED',
       terminalId: 1,
       employeeId: 55,
@@ -61,6 +62,15 @@ describe('Package Events (e2e)', () => {
     expect(response.body.snapshot.currentStatus).toBe(
       'RECEIVED',
     );
+    expect(response.body.snapshot.packageType).toBe('CONVEYABLE');
+    expect(response.body.event.metadata.packageType).toBe('CONVEYABLE');
+  });
+
+  it('should reject a lowercase tracking number', async () => {
+    await request(app.getHttpServer())
+      .post('/package-events')
+      .send({ trackingNumber: 'mail123456', eventType: 'PACKAGE_RECEIVED' })
+      .expect(400);
   });
 
   it('should reject invalid payload', async () => {
@@ -77,25 +87,27 @@ describe('Package Events (e2e)', () => {
 
   it('should reject invalid lifecycle transition', async () => {
 
+  const trackingNumber = packageIdentifier();
+
   // First move package to DELIVERED state
   await request(app.getHttpServer())
     .post('/package-events')
     .send({
-      trackingNumber: 'PKG-INVALID-001',
+      trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
     });
 
   await request(app.getHttpServer())
     .post('/package-events')
     .send({
-      trackingNumber: 'PKG-INVALID-001',
+      trackingNumber,
       eventType: 'PACKAGE_IN_TRANSIT',
     });
 
   await request(app.getHttpServer())
     .post('/package-events')
     .send({
-      trackingNumber: 'PKG-INVALID-001',
+      trackingNumber,
       eventType: 'PACKAGE_DELIVERED',
     });
 
@@ -103,7 +115,7 @@ describe('Package Events (e2e)', () => {
   await request(app.getHttpServer())
     .post('/package-events')
     .send({
-      trackingNumber: 'PKG-INVALID-001',
+      trackingNumber,
       eventType: 'PACKAGE_IN_TRANSIT',
     })
     .expect(400);
@@ -111,7 +123,7 @@ describe('Package Events (e2e)', () => {
 
   it('should reject invalid CREATED → DELIVERED transition', async () => {
 
-  const trackingNumber = `PKG-INVALID-${Date.now()}`;
+  const trackingNumber = packageIdentifier();
 
   await request(app.getHttpServer())
     .post('/package-events')
@@ -124,7 +136,7 @@ describe('Package Events (e2e)', () => {
 
   it('should reject DELIVERED → IN_TRANSIT transition', async () => {
 
-  const trackingNumber = `PKG-DELIVERED-${Date.now()}`;
+  const trackingNumber = packageIdentifier();
 
   // Move through valid lifecycle first
   await request(app.getHttpServer())
@@ -161,7 +173,7 @@ describe('Package Events (e2e)', () => {
   it('should process full package lifecycle correctly', async () => {
 
   const trackingNumber =
-    `PKG-LIFECYCLE-${Date.now()}`;
+    packageIdentifier();
 
   // RECEIVED
   let response = await request(app.getHttpServer())
@@ -287,7 +299,7 @@ describe('Package Events (e2e)', () => {
 it('should reject DELIVERED back to IN_TRAILER transition', async () => {
 
   const trackingNumber =
-    `PKG-REVERSE-${Date.now()}`;
+    packageIdentifier();
 
   await request(app.getHttpServer())
     .post('/package-events')

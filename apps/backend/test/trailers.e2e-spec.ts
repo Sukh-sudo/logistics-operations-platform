@@ -1,3 +1,4 @@
+import { containerIdentifier, trailerIdentifier } from './support/asset-identifiers';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
@@ -45,7 +46,7 @@ await app.init();
   });
 
   it('should create trailer successfully', async () => {
-    const barcode = `TRL-${Date.now()}`;
+    const barcode = trailerIdentifier();
 
     const response = await request(
       app.getHttpServer(),
@@ -73,7 +74,7 @@ await app.init();
 
   it('should reject duplicate trailer barcode', async () => {
     const barcode =
-      `TRL-DUP-${Date.now()}`;
+      trailerIdentifier();
 
     await request(app.getHttpServer())
       .post('/trailers')
@@ -92,7 +93,7 @@ await app.init();
 
   it('should create trailer creation event', async () => {
     const barcode =
-      `TRL-EVENT-${Date.now()}`;
+      trailerIdentifier();
 
     const response = await request(
       app.getHttpServer(),
@@ -124,6 +125,13 @@ await app.init();
       .expect(400);
   });
 
+  it('should reject a lowercase or incorrectly sized trailer barcode', async () => {
+    await request(app.getHttpServer())
+      .post('/trailers')
+      .send({ trailerBarcode: 'trlr123456' })
+      .expect(400);
+  });
+
   it('should load container into trailer', async () => {
 
   // Create container
@@ -132,7 +140,7 @@ await app.init();
       .post('/containers')
       .send({
         containerBarcode:
-          `CONT-${Date.now()}`,
+          containerIdentifier(),
       })
       .expect(201);
 
@@ -142,7 +150,7 @@ await app.init();
       .post('/trailers')
       .send({
         trailerBarcode:
-          `TRL-${Date.now()}`,
+          trailerIdentifier(),
       })
       .expect(201);
 
@@ -169,7 +177,7 @@ await app.init();
 it('should unload container from trailer', async () => {
 
   const barcode =
-    `CONT-UNLOAD-${Date.now()}`;
+    containerIdentifier();
 
   const containerResponse =
     await request(app.getHttpServer())
@@ -184,7 +192,7 @@ it('should unload container from trailer', async () => {
       .post('/trailers')
       .send({
         trailerBarcode:
-          `TRL-UNLOAD-${Date.now()}`,
+          trailerIdentifier(),
       })
       .expect(201);
 
@@ -219,7 +227,7 @@ it('should unload container from trailer', async () => {
 it('should reject loading container already assigned to trailer', async () => {
 
   const barcode =
-    `CONT-DUP-${Date.now()}`;
+    containerIdentifier();
 
   const containerResponse =
     await request(app.getHttpServer())
@@ -234,7 +242,7 @@ it('should reject loading container already assigned to trailer', async () => {
       .post('/trailers')
       .send({
         trailerBarcode:
-          `TRL-A-${Date.now()}`,
+          trailerIdentifier(),
       })
       .expect(201);
 
@@ -243,7 +251,7 @@ it('should reject loading container already assigned to trailer', async () => {
       .post('/trailers')
       .send({
         trailerBarcode:
-          `TRL-B-${Date.now()}`,
+          trailerIdentifier(),
       })
       .expect(201);
 
@@ -273,7 +281,7 @@ it('should reject unloading container not assigned to trailer', async () => {
       .post('/containers')
       .send({
         containerBarcode:
-          `CONT-NOT-${Date.now()}`,
+          containerIdentifier(),
       })
       .expect(201);
 
@@ -282,7 +290,7 @@ it('should reject unloading container not assigned to trailer', async () => {
       .post('/trailers')
       .send({
         trailerBarcode:
-          `TRL-NOT-${Date.now()}`,
+          trailerIdentifier(),
       })
       .expect(201);
 
@@ -304,7 +312,7 @@ it('should increment trailer container count', async () => {
       .post('/containers')
       .send({
         containerBarcode:
-          `CONT-COUNT-${Date.now()}`,
+          containerIdentifier(),
       });
 
   const trailer =
@@ -312,7 +320,7 @@ it('should increment trailer container count', async () => {
       .post('/trailers')
       .send({
         trailerBarcode:
-          `TRL-COUNT-${Date.now()}`,
+          trailerIdentifier(),
       });
 
   const trailerId =
@@ -345,7 +353,7 @@ it('should increment trailer container count', async () => {
 it('should decrement trailer container count', async () => {
 
   const barcode =
-    `CONT-DEC-${Date.now()}`;
+    containerIdentifier();
 
   const container =
     await request(app.getHttpServer())
@@ -359,7 +367,7 @@ it('should decrement trailer container count', async () => {
       .post('/trailers')
       .send({
         trailerBarcode:
-          `TRL-DEC-${Date.now()}`,
+          trailerIdentifier(),
       });
 
   const trailerId =
@@ -401,14 +409,14 @@ it('should create CONTAINER_LOADED_TO_TRAILER event', async () => {
     await request(app.getHttpServer())
       .post('/containers')
       .send({
-        containerBarcode: `CONT-EVENT-${Date.now()}`,
+        containerBarcode: containerIdentifier(),
       });
 
   const trailer =
     await request(app.getHttpServer())
       .post('/trailers')
       .send({
-        trailerBarcode: `TRL-EVENT-${Date.now()}`,
+        trailerBarcode: trailerIdentifier(),
       });
 
   const trailerId =
@@ -428,7 +436,7 @@ it('should create CONTAINER_LOADED_TO_TRAILER event', async () => {
 it('should create CONTAINER_UNLOADED_FROM_TRAILER event', async () => {
 
   const barcode =
-    `CONT-UNLOAD-EVENT-${Date.now()}`;
+    containerIdentifier();
 
   const container =
     await request(app.getHttpServer())
@@ -443,7 +451,7 @@ it('should create CONTAINER_UNLOADED_FROM_TRAILER event', async () => {
       .post('/trailers')
       .send({
         trailerBarcode:
-          `TRL-UNLOAD-EVENT-${Date.now()}`,
+          trailerIdentifier(),
       })
       .expect(201);
 
@@ -486,7 +494,7 @@ it('should return containers inside trailer', async () => {
   )
     .post('/trailers')
     .send({
-      trailerBarcode: `TRL-${Date.now()}`,
+      trailerBarcode: trailerIdentifier(),
     })
     .expect(201);
 
@@ -500,7 +508,7 @@ it('should return containers inside trailer', async () => {
     await request(app.getHttpServer())
       .post('/containers')
       .send({
-        containerBarcode: `CONT-A-${Date.now()}`,
+        containerBarcode: containerIdentifier(),
       })
       .expect(201);
 
@@ -508,7 +516,7 @@ it('should return containers inside trailer', async () => {
     await request(app.getHttpServer())
       .post('/containers')
       .send({
-        containerBarcode: `CONT-B-${Date.now()}`,
+        containerBarcode: containerIdentifier(),
       })
       .expect(201);
 

@@ -11,6 +11,7 @@ import {
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
+import { containerIdentifier, packageIdentifier, trailerIdentifier } from './support/asset-identifiers';
 
 const prisma = new PrismaClient();
 
@@ -132,7 +133,7 @@ describe('Terminals (e2e)', () => {
   it('receives a package and updates warehouse inventory', async () => {
     const terminal = await createTerminal(unique('RCV'));
     const terminalId = terminal.body.terminal.id;
-    const trackingNumber = unique('PKG');
+    const trackingNumber = packageIdentifier();
 
     await request(app.getHttpServer())
       .post('/package-events')
@@ -165,7 +166,7 @@ describe('Terminals (e2e)', () => {
   it('rejects duplicate asset receipt', async () => {
     const terminal = await createTerminal(unique('DUP-RCV'));
     const terminalId = terminal.body.terminal.id;
-    const trackingNumber = unique('PKG-DUP');
+    const trackingNumber = packageIdentifier();
 
     await request(app.getHttpServer()).post('/package-events').send({
       trackingNumber,
@@ -194,7 +195,7 @@ describe('Terminals (e2e)', () => {
     const destination = await createTerminal(unique('DST'));
     const sourceId = source.body.terminal.id;
     const destinationId = destination.body.terminal.id;
-    const trackingNumber = unique('PKG-XFER');
+    const trackingNumber = packageIdentifier();
 
     await request(app.getHttpServer()).post('/package-events').send({
       trackingNumber,
@@ -235,9 +236,9 @@ describe('Terminals (e2e)', () => {
     const destination = await createTerminal(unique('TR-DST'));
     const sourceId = source.body.terminal.id;
     const destinationId = destination.body.terminal.id;
-    const trackingNumber = unique('TR-PKG');
-    const containerBarcode = unique('CONT');
-    const trailerBarcode = unique('TRL');
+    const trackingNumber = packageIdentifier();
+    const containerBarcode = containerIdentifier();
+    const trailerBarcode = trailerIdentifier();
 
     await request(app.getHttpServer()).post('/package-events').send({
       trackingNumber,
@@ -320,7 +321,7 @@ describe('Terminals (e2e)', () => {
   it('prevents closed terminals from processing assets', async () => {
     const terminal = await createTerminal(unique('CLOSED'));
     const terminalId = terminal.body.terminal.id;
-    const trackingNumber = unique('PKG-CLOSED');
+    const trackingNumber = packageIdentifier();
 
     await request(app.getHttpServer())
       .patch(`/terminals/${terminalId}`)

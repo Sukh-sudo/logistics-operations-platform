@@ -1,3 +1,4 @@
+import { packageIdentifier, containerIdentifier } from './support/asset-identifiers';
 import { Test, TestingModule } from '@nestjs/testing';
 import {INestApplication,ValidationPipe,} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
@@ -38,7 +39,7 @@ describe('Containers (e2e)', () => {
 });
 
   it('should create container successfully', async () => {
-    const barcode = `CONT-${Date.now()}`;
+    const barcode = containerIdentifier();
 
     const response = await request(app.getHttpServer())
       .post('/containers')
@@ -59,13 +60,47 @@ describe('Containers (e2e)', () => {
       response.body.snapshot.currentStatus,
     ).toBe('OPEN');
 
+    expect(response.body.snapshot.packageType).toBe('CONVEYABLE');
+    expect(response.body.event.metadata.packageType).toBe('CONVEYABLE');
+
     expect(
       response.body.event.eventType,
     ).toBe('CONTAINER_CREATED');
   });
 
+  it('rejects an invalid or lowercase container barcode', async () => {
+    await request(app.getHttpServer())
+      .post('/containers')
+      .send({ containerBarcode: 'con1234567' })
+      .expect(400);
+  });
+
+  it('rejects loading a package into a container for another package type', async () => {
+    const trackingNumber = packageIdentifier('DG');
+
+    await request(app.getHttpServer())
+      .post('/package-events')
+      .send({ trackingNumber, eventType: 'PACKAGE_RECEIVED' })
+      .expect(201);
+
+    const container = await request(app.getHttpServer())
+      .post('/containers')
+      .send({ containerBarcode: containerIdentifier('CON') })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/containers/${container.body.snapshot.id}/load-package`)
+      .send({ trackingNumber })
+      .expect(400);
+
+    const packageSnapshot = await prisma.packageSnapshot.findUniqueOrThrow({
+      where: { trackingNumber },
+    });
+    expect(packageSnapshot.currentContainerId).toBeNull();
+  });
+
   it('should reject duplicate container barcode', async () => {
-    const barcode = `CONT-DUP-${Date.now()}`;
+    const barcode = containerIdentifier();
 
     await request(app.getHttpServer())
       .post('/containers')
@@ -83,7 +118,7 @@ describe('Containers (e2e)', () => {
   });
 
   it('should create container creation event', async () => {
-    const barcode = `CONT-EVENT-${Date.now()}`;
+    const barcode = containerIdentifier();
 
     const response = await request(app.getHttpServer())
       .post('/containers')
@@ -99,7 +134,7 @@ describe('Containers (e2e)', () => {
 
   it('should load package into container', async () => {
   const trackingNumber =
-    `PKG-LOAD-${Date.now()}`;
+    packageIdentifier();
 
   // Create package
   await request(app.getHttpServer())
@@ -115,7 +150,7 @@ describe('Containers (e2e)', () => {
     await request(app.getHttpServer())
       .post('/containers')
       .send({
-        containerBarcode: `CONT-LOAD-${Date.now()}`,
+        containerBarcode: containerIdentifier(),
       })
       .expect(201);
 
@@ -138,7 +173,7 @@ describe('Containers (e2e)', () => {
 
 it('should reject loading package twice', async () => {
   const trackingNumber =
-    `PKG-DUPLOAD-${Date.now()}`;
+    packageIdentifier();
 
   await request(app.getHttpServer())
     .post('/package-events')
@@ -151,7 +186,7 @@ it('should reject loading package twice', async () => {
     await request(app.getHttpServer())
       .post('/containers')
       .send({
-        containerBarcode: `CONT-DUPLOAD-${Date.now()}`,
+        containerBarcode: containerIdentifier(),
       });
 
   const containerId =
@@ -179,7 +214,7 @@ it('should reject loading package twice', async () => {
 it('should load package into container', async () => {
 
   const trackingNumber =
-    `PKG-${Date.now()}`;
+    packageIdentifier();
 
   await request(app.getHttpServer())
     .post('/package-events')
@@ -193,7 +228,7 @@ it('should load package into container', async () => {
     await request(app.getHttpServer())
       .post('/containers')
       .send({
-        containerBarcode: `CONT-${Date.now()}`,
+        containerBarcode: containerIdentifier(),
       })
       .expect(201);
 
@@ -217,7 +252,7 @@ it('should load package into container', async () => {
 it('should unload package from container', async () => {
 
   const trackingNumber =
-    `PKG-UNLOAD-${Date.now()}`;
+    packageIdentifier();
 
   // Create package
   await request(app.getHttpServer())
@@ -234,7 +269,7 @@ it('should unload package from container', async () => {
       .post('/containers')
       .send({
         containerBarcode:
-          `CONT-UNLOAD-${Date.now()}`,
+          containerIdentifier(),
       })
       .expect(201);
 
@@ -269,7 +304,7 @@ it('should unload package from container', async () => {
 it('should create PACKAGE_LOADED_TO_CONTAINER event', async () => {
 
   const trackingNumber =
-    `PKG-EVENT-${Date.now()}`;
+    packageIdentifier();
 
   // Create package
   await request(app.getHttpServer())
@@ -286,7 +321,7 @@ it('should create PACKAGE_LOADED_TO_CONTAINER event', async () => {
       .post('/containers')
       .send({
         containerBarcode:
-          `CONT-EVENT-${Date.now()}`,
+          containerIdentifier(),
       })
       .expect(201);
 
@@ -322,7 +357,7 @@ it('should create PACKAGE_LOADED_TO_CONTAINER event', async () => {
 it('should create PACKAGE_UNLOADED_FROM_CONTAINER event', async () => {
 
   const trackingNumber =
-    `PKG-UNLOAD-EVENT-${Date.now()}`;
+    packageIdentifier();
 
   // Create package
   await request(app.getHttpServer())
@@ -338,7 +373,7 @@ it('should create PACKAGE_UNLOADED_FROM_CONTAINER event', async () => {
       .post('/containers')
       .send({
         containerBarcode:
-          `CONT-UNLOAD-EVENT-${Date.now()}`,
+          containerIdentifier(),
       });
 
   const containerId =
@@ -380,8 +415,8 @@ it('should create PACKAGE_UNLOADED_FROM_CONTAINER event', async () => {
 });
 
 it('should return packages inside container', async () => {
-  const packageA = `PKG-A-${Date.now()}`;
-  const packageB = `PKG-B-${Date.now()}`;
+  const packageA = packageIdentifier();
+  const packageB = packageIdentifier();
 
   // Create packages
   await request(app.getHttpServer())
@@ -410,7 +445,7 @@ it('should return packages inside container', async () => {
   )
     .post('/containers')
     .send({
-      containerBarcode: `CONT-${Date.now()}`,
+      containerBarcode: containerIdentifier(),
     })
     .expect(201);
 

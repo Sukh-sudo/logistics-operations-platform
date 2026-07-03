@@ -1,3 +1,4 @@
+import { packageIdentifier, containerIdentifier, trailerIdentifier } from './support/asset-identifiers';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -81,7 +82,7 @@ describe('Dashboard API (e2e)', () => {
   });
 
   it('should update dashboard after creating package', async () => {
-    const trackingNumber = `PKG-DASH-${Date.now()}`;
+    const trackingNumber = packageIdentifier();
 
     await request(app.getHttpServer())
       .post('/package-events')
@@ -104,7 +105,7 @@ describe('Dashboard API (e2e)', () => {
     await request(app.getHttpServer())
       .post('/containers')
       .send({
-        containerBarcode: `CONT-DASH-${Date.now()}`,
+        containerBarcode: containerIdentifier(),
       })
       .expect(201);
 
@@ -120,7 +121,7 @@ describe('Dashboard API (e2e)', () => {
     await request(app.getHttpServer())
       .post('/trailers')
       .send({
-        trailerBarcode: `TRL-DASH-${Date.now()}`,
+        trailerBarcode: trailerIdentifier(),
       })
       .expect(201);
 
@@ -133,7 +134,7 @@ describe('Dashboard API (e2e)', () => {
   });
 
   it('should return recent events after activity', async () => {
-    const trackingNumber = `PKG-EVENT-${Date.now()}`;
+    const trackingNumber = packageIdentifier();
 
     await request(app.getHttpServer())
       .post('/package-events')

@@ -1,3 +1,4 @@
+import { packageIdentifier, containerIdentifier, trailerIdentifier } from './support/asset-identifiers';
 import { Test, TestingModule } from '@nestjs/testing';
 import {INestApplication,ValidationPipe,} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
@@ -36,7 +37,7 @@ describe('Search API (e2e)', () => {
 
   it('should find package by barcode', async () => {
     const trackingNumber =
-      `PKG-SEARCH-${Date.now()}`;
+      packageIdentifier();
 
     await request(app.getHttpServer())
       .post('/package-events')
@@ -64,7 +65,7 @@ describe('Search API (e2e)', () => {
 
   it('should find container by barcode', async () => {
     const barcode =
-      `CONT-SEARCH-${Date.now()}`;
+      containerIdentifier();
 
     await request(app.getHttpServer())
       .post('/containers')
@@ -89,7 +90,7 @@ describe('Search API (e2e)', () => {
 
   it('should find trailer by barcode', async () => {
     const barcode =
-      `TRL-SEARCH-${Date.now()}`;
+      trailerIdentifier();
 
     await request(app.getHttpServer())
       .post('/trailers')
