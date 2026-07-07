@@ -9,6 +9,7 @@ import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { TransportationPage } from '../pages/TransportationPage';
+import { SearchPage } from '../pages/SearchPage';
 
 export const router = createBrowserRouter([
   { element: <AuthLayout/>, children: [{ path: '/login', element: <LoginPage/> }] },
@@ -16,8 +17,9 @@ export const router = createBrowserRouter([
     { index: true, element: <HomePage/> },
     { path: 'dashboard', element: <DashboardPage/> },
     { path: 'transportation', element: <TransportationPage/> },
+    { path: 'search', element: <SearchPage/> },
     { path: 'analytics', element: <AnalyticsPage/> },
-    ...['search', 'packages', 'containers', 'trailers', 'events', 'health'].map((path) => ({ path, element: <PlaceholderPage/> })),
+    ...['packages', 'containers', 'trailers', 'events', 'health'].map((path) => ({ path, element: <PlaceholderPage/> })),
   ] }] },
   { path: '*', element: <NotFoundPage/> },
 ]);
