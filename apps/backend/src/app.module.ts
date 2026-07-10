@@ -25,6 +25,7 @@ import { AuthorizationModule } from './modules/authorization/authorization.modul
 import { RouteModule } from './modules/routes/route.module';
 import { TripModule } from './modules/trips/trip.module';
 import { ShipmentModule } from './modules/shipments/shipment.module';
+import { FleetModule } from './modules/fleet/fleet.module';
 
 @Module({
   imports: [
@@ -60,6 +61,8 @@ import { ShipmentModule } from './modules/shipments/shipment.module';
     TripModule,
 
     ShipmentModule,
+
+    FleetModule,
   ],
 })
 export class AppModule implements NestModule {
