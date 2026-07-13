@@ -14,6 +14,7 @@ import { PackageDetailPage } from '../pages/PackageDetailPage';
 import { ContainerDetailPage } from '../pages/ContainerDetailPage';
 import { FleetPage } from '../pages/FleetPage';
 import { TrailerDetailPage } from '../pages/TrailerDetailPage';
+import { EventsPage } from '../pages/EventsPage';
 
 export const router = createBrowserRouter([
   { element: <AuthLayout/>, children: [{ path: '/login', element: <LoginPage/> }] },
@@ -27,7 +28,8 @@ export const router = createBrowserRouter([
     { path: 'containers/:containerBarcode', element: <ContainerDetailPage/> },
     { path: 'trailers/:trailerBarcode', element: <TrailerDetailPage/> },
     { path: 'analytics', element: <AnalyticsPage/> },
-    ...['packages', 'containers', 'trailers', 'events', 'health'].map((path) => ({ path, element: <PlaceholderPage/> })),
+    { path: 'events', element: <EventsPage/> },
+    ...['packages', 'containers', 'trailers', 'health'].map((path) => ({ path, element: <PlaceholderPage/> })),
   ] }] },
   { path: '*', element: <NotFoundPage/> },
 ]);
