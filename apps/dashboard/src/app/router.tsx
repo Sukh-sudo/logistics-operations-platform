@@ -12,6 +12,7 @@ import { TransportationPage } from '../pages/TransportationPage';
 import { SearchPage } from '../pages/SearchPage';
 import { PackageDetailPage } from '../pages/PackageDetailPage';
 import { ContainerDetailPage } from '../pages/ContainerDetailPage';
+import { FleetPage } from '../pages/FleetPage';
 
 export const router = createBrowserRouter([
   { element: <AuthLayout/>, children: [{ path: '/login', element: <LoginPage/> }] },
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
     { index: true, element: <HomePage/> },
     { path: 'dashboard', element: <DashboardPage/> },
     { path: 'transportation', element: <TransportationPage/> },
+    { path: 'fleet', element: <FleetPage/> },
     { path: 'search', element: <SearchPage/> },
     { path: 'packages/:trackingNumber', element: <PackageDetailPage/> },
     { path: 'containers/:containerBarcode', element: <ContainerDetailPage/> },

@@ -8,6 +8,7 @@ const cards = [
   { to: '/containers', title: 'Container visibility', description: 'Inspect container contents and current assignments.', icon: Container, tone: 'bg-emerald-50 text-emerald-700' },
   { to: '/trailers', title: 'Trailer visibility', description: 'Explore trailer manifests, loads, and movement history.', icon: Truck, tone: 'bg-amber-50 text-amber-700' },
   { to: '/transportation', title: 'Transportation', description: 'Follow terminals, routes, trips, and shipment progress.', icon: Route, tone: 'bg-cyan-50 text-cyan-700' },
+  { to: '/fleet', title: 'Fleet visibility', description: 'Monitor trucks, drivers, and trip equipment assignments.', icon: Truck, tone: 'bg-orange-50 text-orange-700' },
   { to: '/events', title: 'Recent events', description: 'Follow the latest operational activity across the network.', icon: Activity, tone: 'bg-rose-50 text-rose-700' },
   { to: '/analytics', title: 'Analytics', description: 'Understand status distribution and operational trends.', icon: TrendingUp, tone: 'bg-indigo-50 text-indigo-700' },
   { to: '/health', title: 'System health', description: 'Check platform availability and connected services.', icon: HeartPulse, tone: 'bg-teal-50 text-teal-700' },
