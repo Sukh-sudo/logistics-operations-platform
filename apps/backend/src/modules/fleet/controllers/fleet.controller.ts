@@ -3,6 +3,7 @@ import type { RequestWithId } from '../../../common/middleware/request-id.middle
 import { CreateDriverDto } from '../dto/create-driver.dto';
 import { CreateTruckDto } from '../dto/create-truck.dto';
 import { FleetService } from '../services/fleet.service';
+import { AssignEquipmentDto } from '../dto/assign-equipment.dto';
 
 @Controller('fleet')
 export class FleetController {
@@ -36,5 +37,20 @@ export class FleetController {
   @Get('drivers/:id')
   getDriver(@Param('id') id: string) {
     return this.fleetService.getDriver(id);
+  }
+
+  @Post('assignments')
+  assignEquipment(@Body() dto: AssignEquipmentDto, @Req() request: RequestWithId) {
+    return this.fleetService.assignEquipment(dto, request.requestId);
+  }
+
+  @Get('assignments')
+  getAssignments() {
+    return this.fleetService.getAssignments();
+  }
+
+  @Post('assignments/:id/release')
+  releaseEquipment(@Param('id') id: string, @Req() request: RequestWithId) {
+    return this.fleetService.releaseEquipment(id, request.requestId);
   }
 }

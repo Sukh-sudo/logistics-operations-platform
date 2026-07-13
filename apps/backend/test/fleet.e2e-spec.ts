@@ -150,4 +150,24 @@ describe('Fleet (e2e)', () => {
       })
       .expect(404);
   });
+
+  it('assigns and releases trip equipment while preserving assignment history', async () => {
+    const originTerminalId = await createTerminal();
+    const destinationTerminalId = await createTerminal();
+    const route = (await request(app.getHttpServer()).post('/routes').send({ routeNumber: unique('FLTR'), name: 'Fleet assignment route', originTerminalId, destinationTerminalId, estimatedDuration: 60 }).expect(201)).body.route;
+    await request(app.getHttpServer()).post(`/routes/${route.id}/activate`).expect(201);
+    const trip = (await request(app.getHttpServer()).post('/trips').send({ tripNumber: unique('FLTTRIP'), routeId: route.id, plannedDeparture: new Date(Date.now() + 3600000).toISOString() }).expect(201)).body.trip;
+    const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ unitNumber: unique('ATRK'), licensePlate: unique('APLT'), terminalId: originTerminalId }).expect(201)).body.truck;
+    const driver = (await request(app.getHttpServer()).post('/fleet/drivers').send({ employeeId: unique('ADRV'), licenseNumber: unique('ALIC'), licenseClass: 'Class 1', terminalId: originTerminalId }).expect(201)).body.driver;
+
+    const assigned = await request(app.getHttpServer()).post('/fleet/assignments').send({ tripId: trip.id, truckId: truck.id, driverId: driver.id }).expect(201);
+    expect(assigned.body.truckSnapshot).toMatchObject({ currentStatus: 'ASSIGNED', assignedTripId: trip.id });
+    await request(app.getHttpServer()).post('/fleet/assignments').send({ tripId: trip.id, truckId: truck.id, driverId: driver.id }).expect(409);
+
+    const released = await request(app.getHttpServer()).post(`/fleet/assignments/${assigned.body.assignment.id}/release`).expect(201);
+    expect(released.body.assignment.status).toBe('RELEASED');
+    expect(released.body.driverSnapshot).toMatchObject({ currentStatus: 'AVAILABLE', assignedTripId: null });
+    const history = await prisma.equipmentAssignment.findMany({ where: { tripId: trip.id } });
+    expect(history).toHaveLength(1);
+  });
 });

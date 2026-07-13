@@ -5,22 +5,50 @@ import { FleetService } from '../services/fleet.service';
 describe('FleetService', () => {
   const tx = {
     terminal: { findUnique: jest.fn() },
-    truck: { create: jest.fn(), findFirst: jest.fn() },
-    driver: { create: jest.fn(), findFirst: jest.fn() },
+    truck: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    driver: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    trip: { findUnique: jest.fn(), update: jest.fn() },
+    equipmentAssignment: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     fleetEvent: { create: jest.fn() },
-    truckSnapshot: { create: jest.fn() },
-    driverSnapshot: { create: jest.fn() },
+    truckSnapshot: { create: jest.fn(), update: jest.fn() },
+    driverSnapshot: { create: jest.fn(), update: jest.fn() },
   };
   const prisma = {
     $transaction: jest.fn((callback) => callback(tx)),
     truck: { findMany: jest.fn(), findUnique: jest.fn() },
     driver: { findMany: jest.fn(), findUnique: jest.fn() },
+    equipmentAssignment: { findMany: jest.fn() },
   };
   let service: FleetService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     service = new FleetService(prisma as never);
+  });
+
+  it('assigns available equipment and updates both snapshots atomically', async () => {
+    const createdAt = new Date();
+    tx.trip.findUnique.mockResolvedValue({ id: 'trip-1', status: 'CREATED', equipmentAssignmentId: null });
+    tx.truck.findUnique.mockResolvedValue({ id: 'truck-1', status: TruckStatus.AVAILABLE, snapshot: { assignedTripId: null } });
+    tx.driver.findUnique.mockResolvedValue({ id: 'driver-1', status: DriverStatus.AVAILABLE, snapshot: { assignedTripId: null } });
+    tx.equipmentAssignment.create.mockResolvedValue({ id: 'assignment-1', tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1', status: 'ACTIVE' });
+    tx.fleetEvent.create.mockResolvedValueOnce({ eventType: FleetEventType.TRUCK_ASSIGNED, createdAt }).mockResolvedValueOnce({ eventType: FleetEventType.DRIVER_ASSIGNED, createdAt });
+    tx.truckSnapshot.update.mockResolvedValue({ assignedTripId: 'trip-1' });
+    tx.driverSnapshot.update.mockResolvedValue({ assignedTripId: 'trip-1' });
+
+    const result = await service.assignEquipment({ tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1' });
+
+    expect(tx.equipmentAssignment.create).toHaveBeenCalled();
+    expect(tx.trip.update).toHaveBeenCalledWith({ where: { id: 'trip-1' }, data: { equipmentAssignmentId: 'assignment-1' } });
+    expect(result.events.map((event) => event.eventType)).toEqual([FleetEventType.TRUCK_ASSIGNED, FleetEventType.DRIVER_ASSIGNED]);
+  });
+
+  it('rejects assignment when a truck is unavailable', async () => {
+    tx.trip.findUnique.mockResolvedValue({ id: 'trip-1', status: 'CREATED', equipmentAssignmentId: null });
+    tx.truck.findUnique.mockResolvedValue({ id: 'truck-1', status: TruckStatus.MAINTENANCE, snapshot: { assignedTripId: null } });
+    tx.driver.findUnique.mockResolvedValue({ id: 'driver-1', status: DriverStatus.AVAILABLE, snapshot: { assignedTripId: null } });
+    await expect(service.assignEquipment({ tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1' })).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.equipmentAssignment.create).not.toHaveBeenCalled();
   });
 
   it('creates a truck, fleet event, and truck snapshot in one transaction', async () => {

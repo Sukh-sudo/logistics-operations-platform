@@ -67,21 +67,23 @@ model Route {
 }
 
 model Trip {
-  id                    String        @id @default(cuid())
-  tripNumber            String        @unique
-  routeId               String
-  equipmentAssignmentId String?
-  status                TripStatus    @default(CREATED)
-  plannedDeparture      DateTime
-  actualDeparture       DateTime?
-  plannedArrival        DateTime
-  actualArrival         DateTime?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
-  route                 Route         @relation(fields: [routeId], references: [id])
-  stops                 TripStop[]
-  events                TripEvent[]
-  snapshot              TripSnapshot?
+  id                        String                @id @default(cuid())
+  tripNumber                String                @unique
+  routeId                   String
+  equipmentAssignmentId     String?               @unique
+  status                    TripStatus            @default(CREATED)
+  plannedDeparture          DateTime
+  actualDeparture           DateTime?
+  plannedArrival            DateTime
+  actualArrival             DateTime?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+  route                     Route                 @relation(fields: [routeId], references: [id])
+  stops                     TripStop[]
+  events                    TripEvent[]
+  snapshot                  TripSnapshot?
+  equipmentAssignments      EquipmentAssignment[]
+  activeEquipmentAssignment EquipmentAssignment?  @relation("ActiveTripEquipment", fields: [equipmentAssignmentId], references: [id])
 
   @@index([routeId])
   @@index([status])
@@ -197,36 +199,38 @@ model ShipmentSnapshot {
 }
 
 model Truck {
-  id           String        @id @default(cuid())
-  unitNumber   String        @unique
-  licensePlate String        @unique
-  status       TruckStatus   @default(AVAILABLE)
-  terminalId   Int?
-  year         Int?
-  make         String?
-  model        String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  terminal     Terminal?     @relation(fields: [terminalId], references: [id])
-  events       FleetEvent[]
-  snapshot     TruckSnapshot?
+  id                   String                @id @default(cuid())
+  unitNumber           String                @unique
+  licensePlate         String                @unique
+  status               TruckStatus           @default(AVAILABLE)
+  terminalId           Int?
+  year                 Int?
+  make                 String?
+  model                String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  terminal             Terminal?             @relation(fields: [terminalId], references: [id])
+  events               FleetEvent[]
+  snapshot             TruckSnapshot?
+  equipmentAssignments EquipmentAssignment[]
 
   @@index([status])
   @@index([terminalId])
 }
 
 model Driver {
-  id            String          @id @default(cuid())
-  employeeId    String          @unique
-  licenseNumber String          @unique
-  licenseClass  String
-  status        DriverStatus    @default(AVAILABLE)
-  terminalId    Int?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  terminal      Terminal?       @relation(fields: [terminalId], references: [id])
-  events        FleetEvent[]
-  snapshot      DriverSnapshot?
+  id                   String                @id @default(cuid())
+  employeeId           String                @unique
+  licenseNumber        String                @unique
+  licenseClass         String
+  status               DriverStatus          @default(AVAILABLE)
+  terminalId           Int?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  terminal             Terminal?             @relation(fields: [terminalId], references: [id])
+  events               FleetEvent[]
+  snapshot             DriverSnapshot?
+  equipmentAssignments EquipmentAssignment[]
 
   @@index([status])
   @@index([terminalId])
@@ -246,6 +250,26 @@ model FleetEvent {
   @@index([truckId, createdAt])
   @@index([driverId, createdAt])
   @@index([correlationId])
+}
+
+// Equipment assignments are immutable allocation history. Replacing equipment
+// releases the current row and creates a new assignment instead of overwriting it.
+model EquipmentAssignment {
+  id         String                    @id @default(cuid())
+  tripId     String
+  truckId    String
+  driverId   String
+  status     EquipmentAssignmentStatus @default(ACTIVE)
+  assignedAt DateTime                  @default(now())
+  releasedAt DateTime?
+  trip       Trip                      @relation(fields: [tripId], references: [id])
+  activeTrip Trip?                     @relation("ActiveTripEquipment")
+  truck      Truck                     @relation(fields: [truckId], references: [id])
+  driver     Driver                    @relation(fields: [driverId], references: [id])
+
+  @@index([tripId, status])
+  @@index([truckId, status])
+  @@index([driverId, status])
 }
 
 model TruckSnapshot {
@@ -716,6 +740,12 @@ enum FleetEventType {
   MAINTENANCE_COMPLETED
   TRUCK_OUT_OF_SERVICE
   TRUCK_RETURNED
+  EQUIPMENT_RELEASED
+}
+
+enum EquipmentAssignmentStatus {
+  ACTIVE
+  RELEASED
 }
 
 enum UserStatus {
