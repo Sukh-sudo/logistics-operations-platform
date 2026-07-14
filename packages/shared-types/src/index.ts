@@ -8,3 +8,4 @@ export * from './search.types.js';
 export * from './trailer.types.js';
 export * from './terminal.types.js';
 export * from './route.types.js';
+export * from './trip.types.js';

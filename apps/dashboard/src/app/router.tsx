@@ -18,6 +18,7 @@ import { EventsPage } from '../pages/EventsPage';
 import { HealthPage } from '../pages/HealthPage';
 import { TerminalDetailPage } from '../pages/TerminalDetailPage';
 import { RouteDetailPage } from '../pages/RouteDetailPage';
+import { TripDetailPage } from '../pages/TripDetailPage';
 
 export const router = createBrowserRouter([
   { element: <AuthLayout/>, children: [{ path: '/login', element: <LoginPage/> }] },
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
     { path: 'transportation', element: <TransportationPage/> },
     { path: 'terminals/:terminalId', element: <TerminalDetailPage/> },
     { path: 'routes/:routeId', element: <RouteDetailPage/> },
+    { path: 'trips/:tripId', element: <TripDetailPage/> },
     { path: 'fleet', element: <FleetPage/> },
     { path: 'search', element: <SearchPage/> },
     { path: 'packages/:trackingNumber', element: <PackageDetailPage/> },
