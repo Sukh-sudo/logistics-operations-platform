@@ -6,3 +6,4 @@ export * from './fleet.types.js';
 export * from './package.types.js';
 export * from './search.types.js';
 export * from './trailer.types.js';
+export * from './terminal.types.js';
