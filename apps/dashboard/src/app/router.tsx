@@ -20,6 +20,8 @@ import { TerminalDetailPage } from '../pages/TerminalDetailPage';
 import { RouteDetailPage } from '../pages/RouteDetailPage';
 import { TripDetailPage } from '../pages/TripDetailPage';
 import { ShipmentDetailPage } from '../pages/ShipmentDetailPage';
+import { TruckDetailPage } from '../pages/TruckDetailPage';
+import { DriverDetailPage } from '../pages/DriverDetailPage';
 
 export const router = createBrowserRouter([
   { element: <AuthLayout/>, children: [{ path: '/login', element: <LoginPage/> }] },
@@ -32,6 +34,8 @@ export const router = createBrowserRouter([
     { path: 'trips/:tripId', element: <TripDetailPage/> },
     { path: 'shipments/:shipmentId', element: <ShipmentDetailPage/> },
     { path: 'fleet', element: <FleetPage/> },
+    { path: 'fleet/trucks/:truckId', element: <TruckDetailPage/> },
+    { path: 'fleet/drivers/:driverId', element: <DriverDetailPage/> },
     { path: 'search', element: <SearchPage/> },
     { path: 'packages/:trackingNumber', element: <PackageDetailPage/> },
     { path: 'containers/:containerBarcode', element: <ContainerDetailPage/> },
