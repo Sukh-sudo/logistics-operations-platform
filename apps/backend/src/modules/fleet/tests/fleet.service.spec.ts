@@ -8,16 +8,20 @@ describe('FleetService', () => {
     truck: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     driver: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     trip: { findUnique: jest.fn(), update: jest.fn() },
-    equipmentAssignment: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    equipmentAssignment: { create: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     fleetEvent: { create: jest.fn() },
     truckSnapshot: { create: jest.fn(), update: jest.fn() },
     driverSnapshot: { create: jest.fn(), update: jest.fn() },
+    trailerSnapshot: { findUnique: jest.fn() },
   };
   const prisma = {
     $transaction: jest.fn((callback) => callback(tx)),
     truck: { findMany: jest.fn(), findUnique: jest.fn() },
     driver: { findMany: jest.fn(), findUnique: jest.fn() },
     equipmentAssignment: { findMany: jest.fn() },
+    truckSnapshot: { findMany: jest.fn() },
+    driverSnapshot: { findMany: jest.fn() },
+    trailerSnapshot: { findMany: jest.fn() },
   };
   let service: FleetService;
 
@@ -31,12 +35,14 @@ describe('FleetService', () => {
     tx.trip.findUnique.mockResolvedValue({ id: 'trip-1', status: 'CREATED', equipmentAssignmentId: null });
     tx.truck.findUnique.mockResolvedValue({ id: 'truck-1', status: TruckStatus.AVAILABLE, snapshot: { assignedTripId: null } });
     tx.driver.findUnique.mockResolvedValue({ id: 'driver-1', status: DriverStatus.AVAILABLE, snapshot: { assignedTripId: null } });
-    tx.equipmentAssignment.create.mockResolvedValue({ id: 'assignment-1', tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1', status: 'ACTIVE' });
+    tx.trailerSnapshot.findUnique.mockResolvedValue({ id: 'trailer-1', currentStatus: 'OPEN' });
+    tx.equipmentAssignment.findFirst.mockResolvedValue(null);
+    tx.equipmentAssignment.create.mockResolvedValue({ id: 'assignment-1', tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1', trailerId: 'trailer-1', status: 'ACTIVE' });
     tx.fleetEvent.create.mockResolvedValueOnce({ eventType: FleetEventType.TRUCK_ASSIGNED, createdAt }).mockResolvedValueOnce({ eventType: FleetEventType.DRIVER_ASSIGNED, createdAt });
     tx.truckSnapshot.update.mockResolvedValue({ assignedTripId: 'trip-1' });
     tx.driverSnapshot.update.mockResolvedValue({ assignedTripId: 'trip-1' });
 
-    const result = await service.assignEquipment({ tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1' });
+    const result = await service.assignEquipment({ tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1', trailerId: 'trailer-1' });
 
     expect(tx.equipmentAssignment.create).toHaveBeenCalled();
     expect(tx.trip.update).toHaveBeenCalledWith({ where: { id: 'trip-1' }, data: { equipmentAssignmentId: 'assignment-1' } });
@@ -47,8 +53,18 @@ describe('FleetService', () => {
     tx.trip.findUnique.mockResolvedValue({ id: 'trip-1', status: 'CREATED', equipmentAssignmentId: null });
     tx.truck.findUnique.mockResolvedValue({ id: 'truck-1', status: TruckStatus.MAINTENANCE, snapshot: { assignedTripId: null } });
     tx.driver.findUnique.mockResolvedValue({ id: 'driver-1', status: DriverStatus.AVAILABLE, snapshot: { assignedTripId: null } });
-    await expect(service.assignEquipment({ tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1' })).rejects.toBeInstanceOf(ConflictException);
+    tx.trailerSnapshot.findUnique.mockResolvedValue({ id: 'trailer-1', currentStatus: 'OPEN' });
+    tx.equipmentAssignment.findFirst.mockResolvedValue(null);
+    await expect(service.assignEquipment({ tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1', trailerId: 'trailer-1' })).rejects.toBeInstanceOf(ConflictException);
     expect(tx.equipmentAssignment.create).not.toHaveBeenCalled();
+  });
+
+  it('prevents manual equipment release while a trip is in progress', async () => {
+    tx.equipmentAssignment.findUnique.mockResolvedValue({ id: 'assignment-1', status: 'ACTIVE', trip: { status: 'IN_PROGRESS' } });
+
+    await expect(service.releaseEquipment('assignment-1')).rejects.toBeInstanceOf(ConflictException);
+
+    expect(tx.equipmentAssignment.update).not.toHaveBeenCalled();
   });
 
   it('creates a truck, fleet event, and truck snapshot in one transaction', async () => {
@@ -178,5 +194,16 @@ describe('FleetService', () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(tx.driver.create).not.toHaveBeenCalled();
+  });
+
+  it('returns snapshot-backed available resources for resource scheduling', async () => {
+    prisma.truckSnapshot.findMany.mockResolvedValue([{ id: 'ts-1', truckId: 'truck-1', currentStatus: 'AVAILABLE', assignedTripId: null, truck: { id: 'truck-1', unitNumber: 'TRK-1' } }]);
+    prisma.driverSnapshot.findMany.mockResolvedValue([{ id: 'ds-1', driverId: 'driver-1', currentStatus: 'AVAILABLE', assignedTripId: null, driver: { id: 'driver-1', employeeId: 'DRV-1' } }]);
+    prisma.trailerSnapshot.findMany.mockResolvedValue([{ id: 'trailer-1', trailerBarcode: 'TRL-1', currentStatus: 'OPEN' }]);
+
+    const result = await service.getAvailability(7);
+
+    expect(prisma.truckSnapshot.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ currentTerminalId: 7, currentStatus: TruckStatus.AVAILABLE }) }));
+    expect(result).toMatchObject({ trucks: [{ id: 'truck-1' }], drivers: [{ id: 'driver-1' }], trailers: [{ id: 'trailer-1' }] });
   });
 });

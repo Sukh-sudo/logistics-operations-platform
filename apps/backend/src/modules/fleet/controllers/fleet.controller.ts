@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
 import { CreateDriverDto } from '../dto/create-driver.dto';
 import { CreateTruckDto } from '../dto/create-truck.dto';
 import { FleetService } from '../services/fleet.service';
 import { AssignEquipmentDto } from '../dto/assign-equipment.dto';
+import { FleetAvailabilityQueryDto } from '../dto/fleet-availability-query.dto';
 
 @Controller('fleet')
 export class FleetController {
@@ -37,6 +38,11 @@ export class FleetController {
   @Get('drivers/:id')
   getDriver(@Param('id') id: string) {
     return this.fleetService.getDriver(id);
+  }
+
+  @Get('availability')
+  getAvailability(@Query() query: FleetAvailabilityQueryDto) {
+    return this.fleetService.getAvailability(query.terminalId);
   }
 
   @Post('assignments')

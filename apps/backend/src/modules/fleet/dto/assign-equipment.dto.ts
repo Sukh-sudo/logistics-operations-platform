@@ -12,4 +12,8 @@ export class AssignEquipmentDto {
   @IsString()
   @IsNotEmpty()
   driverId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  trailerId!: string;
 }

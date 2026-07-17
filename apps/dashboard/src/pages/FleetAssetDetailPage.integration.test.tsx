@@ -11,7 +11,7 @@ const renderPage = (page: React.ReactNode) => render(<QueryClientProvider client
 
 describe('FleetAssetDetailPage', () => {
   beforeEach(() => {
-    vi.mocked(fleetApi.assignments).mockResolvedValue([{ id: 'assignment-1', status: 'ACTIVE', assignedAt: '2026-07-12T12:00:00Z', releasedAt: null, trip: { id: 'trip-1', tripNumber: 'TRIP-100', status: 'CREATED' }, truck: { id: 'truck-1', unitNumber: 'TRK-100', licensePlate: 'ABC-123' }, driver: { id: 'driver-1', employeeId: 'DRV-100', licenseNumber: 'LIC-100' } }]);
+    vi.mocked(fleetApi.assignments).mockResolvedValue([{ id: 'assignment-1', status: 'ACTIVE', assignedAt: '2026-07-12T12:00:00Z', releasedAt: null, trip: { id: 'trip-1', tripNumber: 'TRIP-100', status: 'CREATED' }, truck: { id: 'truck-1', unitNumber: 'TRK-100', licensePlate: 'ABC-123' }, driver: { id: 'driver-1', employeeId: 'DRV-100', licenseNumber: 'LIC-100' }, trailer: { id: 'trailer-1', trailerBarcode: 'TRL-100', currentStatus: 'OPEN' } }]);
   });
 
   it('renders a truck snapshot and its immutable assignment history', async () => {

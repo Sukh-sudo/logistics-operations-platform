@@ -29,6 +29,15 @@ describe('Fleet (e2e)', () => {
     return response.body.terminal.id as number;
   };
 
+  const createTrailer = async () => {
+    const trailerBarcode = unique('TRL');
+    const response = await request(app.getHttpServer())
+      .post('/trailers')
+      .send({ trailerBarcode })
+      .expect(201);
+    return response.body.snapshot.id as string;
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -151,7 +160,7 @@ describe('Fleet (e2e)', () => {
       .expect(404);
   });
 
-  it('assigns and releases trip equipment while preserving assignment history', async () => {
+  it('schedules complete trip equipment and releases it through the trip lifecycle', async () => {
     const originTerminalId = await createTerminal();
     const destinationTerminalId = await createTerminal();
     const route = (await request(app.getHttpServer()).post('/routes').send({ routeNumber: unique('FLTR'), name: 'Fleet assignment route', originTerminalId, destinationTerminalId, estimatedDuration: 60 }).expect(201)).body.route;
@@ -159,15 +168,28 @@ describe('Fleet (e2e)', () => {
     const trip = (await request(app.getHttpServer()).post('/trips').send({ tripNumber: unique('FLTTRIP'), routeId: route.id, plannedDeparture: new Date(Date.now() + 3600000).toISOString() }).expect(201)).body.trip;
     const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ unitNumber: unique('ATRK'), licensePlate: unique('APLT'), terminalId: originTerminalId }).expect(201)).body.truck;
     const driver = (await request(app.getHttpServer()).post('/fleet/drivers').send({ employeeId: unique('ADRV'), licenseNumber: unique('ALIC'), licenseClass: 'Class 1', terminalId: originTerminalId }).expect(201)).body.driver;
+    const trailerId = await createTrailer();
 
-    const assigned = await request(app.getHttpServer()).post('/fleet/assignments').send({ tripId: trip.id, truckId: truck.id, driverId: driver.id }).expect(201);
+    const availableBefore = await request(app.getHttpServer()).get('/fleet/availability').expect(200);
+    expect(availableBefore.body.trailers.some((item: any) => item.id === trailerId)).toBe(true);
+
+    const assigned = await request(app.getHttpServer()).post('/fleet/assignments').send({ tripId: trip.id, truckId: truck.id, driverId: driver.id, trailerId }).expect(201);
     expect(assigned.body.truckSnapshot).toMatchObject({ currentStatus: 'ASSIGNED', assignedTripId: trip.id });
-    await request(app.getHttpServer()).post('/fleet/assignments').send({ tripId: trip.id, truckId: truck.id, driverId: driver.id }).expect(409);
+    await request(app.getHttpServer()).post('/fleet/assignments').send({ tripId: trip.id, truckId: truck.id, driverId: driver.id, trailerId }).expect(409);
 
-    const released = await request(app.getHttpServer()).post(`/fleet/assignments/${assigned.body.assignment.id}/release`).expect(201);
-    expect(released.body.assignment.status).toBe('RELEASED');
-    expect(released.body.driverSnapshot).toMatchObject({ currentStatus: 'AVAILABLE', assignedTripId: null });
+    const availableAssigned = await request(app.getHttpServer()).get('/fleet/availability').expect(200);
+    expect(availableAssigned.body.trucks.some((item: any) => item.id === truck.id)).toBe(false);
+    expect(availableAssigned.body.drivers.some((item: any) => item.id === driver.id)).toBe(false);
+    expect(availableAssigned.body.trailers.some((item: any) => item.id === trailerId)).toBe(false);
+
+    const started = await request(app.getHttpServer()).post(`/trips/${trip.id}/start`).expect(201);
+    expect(started.body.fleet).toMatchObject({ truckSnapshot: { currentStatus: 'IN_SERVICE' }, driverSnapshot: { currentStatus: 'ON_TRIP' }, trailerSnapshot: { currentStatus: 'IN_TRANSIT' } });
+    await request(app.getHttpServer()).post(`/fleet/assignments/${assigned.body.assignment.id}/release`).expect(409);
+
+    const cancelled = await request(app.getHttpServer()).post(`/trips/${trip.id}/cancel`).expect(201);
+    expect(cancelled.body.fleet).toMatchObject({ driverSnapshot: { currentStatus: 'AVAILABLE', assignedTripId: null }, trailerSnapshot: { currentStatus: 'ARRIVED' } });
     const history = await prisma.equipmentAssignment.findMany({ where: { tripId: trip.id } });
     expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ trailerId, status: 'RELEASED' });
   });
 });

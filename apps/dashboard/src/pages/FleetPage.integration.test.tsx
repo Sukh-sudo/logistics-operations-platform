@@ -10,7 +10,7 @@ describe('FleetPage', () => {
   beforeEach(() => {
     vi.mocked(fleetApi.trucks).mockResolvedValue([{ id: 'truck-1', unitNumber: 'TRK-100', licensePlate: 'ABC-123', status: 'ASSIGNED', year: 2025, make: 'Freightliner', model: 'Cascadia', terminal: { id: 1, terminalCode: 'YYC', name: 'Calgary' }, snapshot: { currentStatus: 'ASSIGNED', currentTerminalId: 1, assignedTripId: 'trip-1', lastActivityAt: null } }]);
     vi.mocked(fleetApi.drivers).mockResolvedValue([]);
-    vi.mocked(fleetApi.assignments).mockResolvedValue([{ id: 'assignment-1', status: 'ACTIVE', assignedAt: '2026-07-12T12:00:00Z', releasedAt: null, trip: { id: 'trip-1', tripNumber: 'TRIP-100', status: 'CREATED' }, truck: { id: 'truck-1', unitNumber: 'TRK-100', licensePlate: 'ABC-123' }, driver: { id: 'driver-1', employeeId: 'DRV-100', licenseNumber: 'LIC-100' } }]);
+    vi.mocked(fleetApi.assignments).mockResolvedValue([{ id: 'assignment-1', status: 'ACTIVE', assignedAt: '2026-07-12T12:00:00Z', releasedAt: null, trip: { id: 'trip-1', tripNumber: 'TRIP-100', status: 'CREATED' }, truck: { id: 'truck-1', unitNumber: 'TRK-100', licensePlate: 'ABC-123' }, driver: { id: 'driver-1', employeeId: 'DRV-100', licenseNumber: 'LIC-100' }, trailer: { id: 'trailer-1', trailerBarcode: 'TRL-100', currentStatus: 'OPEN' } }]);
   });
 
   it('shows snapshot-backed trucks and assignment history', async () => {

@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DriverStatus, EquipmentAssignmentStatus, FleetEventType, Prisma, TripStatus, TruckStatus } from '@prisma/client';
+import { DriverStatus, EquipmentAssignmentStatus, FleetEventType, Prisma, TrailerStatus, TripStatus, TruckStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CreateDriverDto } from '../dto/create-driver.dto';
@@ -143,31 +143,67 @@ export class FleetService {
     return driver;
   }
 
+  getAvailability(terminalId?: number) {
+    // Availability reads come directly from snapshots; events remain historical truth.
+    const snapshotWhere = {
+      currentTerminalId: terminalId,
+      assignedTripId: null,
+    };
+    return Promise.all([
+      this.prisma.truckSnapshot.findMany({
+        where: { ...snapshotWhere, currentStatus: TruckStatus.AVAILABLE },
+        include: { truck: { include: { terminal: true } } },
+        orderBy: { truck: { unitNumber: 'asc' } },
+      }),
+      this.prisma.driverSnapshot.findMany({
+        where: { ...snapshotWhere, currentStatus: DriverStatus.AVAILABLE },
+        include: { driver: { include: { terminal: true } } },
+        orderBy: { driver: { employeeId: 'asc' } },
+      }),
+      this.prisma.trailerSnapshot.findMany({
+        where: {
+          currentStatus: { in: [TrailerStatus.OPEN, TrailerStatus.CLOSED, TrailerStatus.ARRIVED] },
+          currentTerminalId: terminalId,
+          equipmentAssignments: { none: { status: EquipmentAssignmentStatus.ACTIVE } },
+        },
+        orderBy: { trailerBarcode: 'asc' },
+      }),
+    ]).then(([truckSnapshots, driverSnapshots, trailers]) => ({
+      trucks: truckSnapshots.map(({ truck, ...snapshot }) => ({ ...truck, snapshot })),
+      drivers: driverSnapshots.map(({ driver, ...snapshot }) => ({ ...driver, snapshot })),
+      trailers,
+    }));
+  }
+
   async assignEquipment(dto: AssignEquipmentDto, requestId?: string) {
     const correlationId = requestId ?? randomUUID();
     return this.prisma.$transaction(async (tx) => {
-      const [trip, truck, driver] = await Promise.all([
+      const [trip, truck, driver, trailer, trailerAssignment] = await Promise.all([
         tx.trip.findUnique({ where: { id: dto.tripId } }),
         tx.truck.findUnique({ where: { id: dto.truckId }, include: { snapshot: true } }),
         tx.driver.findUnique({ where: { id: dto.driverId }, include: { snapshot: true } }),
+        tx.trailerSnapshot.findUnique({ where: { id: dto.trailerId } }),
+        tx.equipmentAssignment.findFirst({ where: { trailerId: dto.trailerId, status: EquipmentAssignmentStatus.ACTIVE } }),
       ]);
       if (!trip) throw new NotFoundException('Trip not found');
       if (!truck) throw new NotFoundException('Truck not found');
       if (!driver) throw new NotFoundException('Driver not found');
+      if (!trailer) throw new NotFoundException('Trailer not found');
       if (trip.status !== TripStatus.CREATED) throw new ConflictException('Equipment can only be assigned to a created trip');
       if (trip.equipmentAssignmentId) throw new ConflictException('Trip already has active equipment');
       if (truck.status !== TruckStatus.AVAILABLE || truck.snapshot?.assignedTripId) throw new ConflictException('Truck is not available');
       if (driver.status !== DriverStatus.AVAILABLE || driver.snapshot?.assignedTripId) throw new ConflictException('Driver is not available');
+      if (trailer.currentStatus === TrailerStatus.IN_TRANSIT || trailerAssignment) throw new ConflictException('Trailer is not available');
 
       // The assignment row preserves allocation history; snapshots serve current-state reads.
       const assignment = await tx.equipmentAssignment.create({
-        data: { tripId: trip.id, truckId: truck.id, driverId: driver.id },
+        data: { tripId: trip.id, truckId: truck.id, driverId: driver.id, trailerId: trailer.id },
       });
       await tx.trip.update({ where: { id: trip.id }, data: { equipmentAssignmentId: assignment.id } });
       await tx.truck.update({ where: { id: truck.id }, data: { status: TruckStatus.ASSIGNED } });
       await tx.driver.update({ where: { id: driver.id }, data: { status: DriverStatus.ASSIGNED } });
-      const truckEvent = await tx.fleetEvent.create({ data: { truckId: truck.id, eventType: FleetEventType.TRUCK_ASSIGNED, correlationId, payload: { tripId: trip.id, assignmentId: assignment.id } } });
-      const driverEvent = await tx.fleetEvent.create({ data: { driverId: driver.id, eventType: FleetEventType.DRIVER_ASSIGNED, correlationId, payload: { tripId: trip.id, assignmentId: assignment.id } } });
+      const truckEvent = await tx.fleetEvent.create({ data: { truckId: truck.id, eventType: FleetEventType.TRUCK_ASSIGNED, correlationId, payload: { tripId: trip.id, trailerId: trailer.id, assignmentId: assignment.id } } });
+      const driverEvent = await tx.fleetEvent.create({ data: { driverId: driver.id, eventType: FleetEventType.DRIVER_ASSIGNED, correlationId, payload: { tripId: trip.id, trailerId: trailer.id, assignmentId: assignment.id } } });
       const truckSnapshot = await tx.truckSnapshot.update({ where: { truckId: truck.id }, data: { currentStatus: TruckStatus.ASSIGNED, assignedTripId: trip.id, lastActivityAt: truckEvent.createdAt } });
       const driverSnapshot = await tx.driverSnapshot.update({ where: { driverId: driver.id }, data: { currentStatus: DriverStatus.ASSIGNED, assignedTripId: trip.id, lastActivityAt: driverEvent.createdAt } });
       return { assignment, events: [truckEvent, driverEvent], truckSnapshot, driverSnapshot };
@@ -177,9 +213,10 @@ export class FleetService {
   async releaseEquipment(id: string, requestId?: string) {
     const correlationId = requestId ?? randomUUID();
     return this.prisma.$transaction(async (tx) => {
-      const current = await tx.equipmentAssignment.findUnique({ where: { id } });
+      const current = await tx.equipmentAssignment.findUnique({ where: { id }, include: { trip: true } });
       if (!current) throw new NotFoundException('Equipment assignment not found');
       if (current.status !== EquipmentAssignmentStatus.ACTIVE) throw new ConflictException('Equipment assignment is already released');
+      if (current.trip.status === TripStatus.IN_PROGRESS) throw new ConflictException('Equipment cannot be released while the trip is in progress');
       const assignment = await tx.equipmentAssignment.update({ where: { id }, data: { status: EquipmentAssignmentStatus.RELEASED, releasedAt: new Date() } });
       await tx.trip.update({ where: { id: current.tripId }, data: { equipmentAssignmentId: null } });
       await tx.truck.update({ where: { id: current.truckId }, data: { status: TruckStatus.AVAILABLE } });
@@ -193,7 +230,7 @@ export class FleetService {
   }
 
   getAssignments() {
-    return this.prisma.equipmentAssignment.findMany({ include: { trip: true, truck: true, driver: true }, orderBy: { assignedAt: 'desc' } });
+    return this.prisma.equipmentAssignment.findMany({ include: { trip: true, truck: true, driver: true, trailer: true }, orderBy: { assignedAt: 'desc' } });
   }
 
   private async ensureTerminalExists(tx: TransactionClient, terminalId?: number) {

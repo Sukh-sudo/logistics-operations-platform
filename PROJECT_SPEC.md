@@ -2337,7 +2337,7 @@ Architecture Version
 Current Development Phase
 
 ```
-Phase 2 completed; Phase 3 not started
+Phase 3 completed; Phase 4 not started
 ```
 
 Primary Architectural Style

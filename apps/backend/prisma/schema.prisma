@@ -259,6 +259,7 @@ model EquipmentAssignment {
   tripId     String
   truckId    String
   driverId   String
+  trailerId  String?
   status     EquipmentAssignmentStatus @default(ACTIVE)
   assignedAt DateTime                  @default(now())
   releasedAt DateTime?
@@ -266,10 +267,12 @@ model EquipmentAssignment {
   activeTrip Trip?                     @relation("ActiveTripEquipment")
   truck      Truck                     @relation(fields: [truckId], references: [id])
   driver     Driver                    @relation(fields: [driverId], references: [id])
+  trailer    TrailerSnapshot?          @relation(fields: [trailerId], references: [id])
 
   @@index([tripId, status])
   @@index([truckId, status])
   @@index([driverId, status])
+  @@index([trailerId, status])
 }
 
 model TruckSnapshot {
@@ -538,14 +541,15 @@ model PackageContainerHistory {
 }
 
 model TrailerSnapshot {
-  id                String         @id @default(cuid())
-  trailerBarcode    String         @unique
-  currentStatus     TrailerStatus
-  containerCount    Int            @default(0)
-  packageCount      Int            @default(0)
-  currentTerminalId Int?
-  updatedAt         DateTime       @updatedAt
-  events            TrailerEvent[]
+  id                   String                @id @default(cuid())
+  trailerBarcode       String                @unique
+  currentStatus        TrailerStatus
+  containerCount       Int                   @default(0)
+  packageCount         Int                   @default(0)
+  currentTerminalId    Int?
+  updatedAt            DateTime              @updatedAt
+  events               TrailerEvent[]
+  equipmentAssignments EquipmentAssignment[]
 }
 
 model TrailerEvent {
@@ -736,6 +740,8 @@ enum FleetEventType {
   DRIVER_CREATED
   TRUCK_ASSIGNED
   DRIVER_ASSIGNED
+  TRUCK_IN_SERVICE
+  DRIVER_ON_TRIP
   MAINTENANCE_SCHEDULED
   MAINTENANCE_COMPLETED
   TRUCK_OUT_OF_SERVICE
