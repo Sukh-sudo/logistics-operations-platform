@@ -19,7 +19,8 @@ describe('TransportationPage filtering integration', () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><TransportationPage/></QueryClientProvider>);
     await user.click(screen.getByRole('button', { name: /Routes/ }));
     await screen.findAllByText('R-YYC-YEG'); expect(screen.getAllByText('R-YYC-YVR')).toHaveLength(2);
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-07-02' } });
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-07-02' } });
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-07-02' } });
     await user.selectOptions(screen.getByLabelText('Origin'), '1');
     await user.selectOptions(screen.getByLabelText('Destination'), '2');
     await waitFor(() => expect(screen.queryByText('R-YYC-YVR')).toBeNull()); expect(screen.getAllByText('R-YYC-YEG')).toHaveLength(2);
@@ -27,8 +28,10 @@ describe('TransportationPage filtering integration', () => {
   it('clears active filters', async () => {
     const user = userEvent.setup();
     render(<QueryClientProvider client={new QueryClient()}><TransportationPage/></QueryClientProvider>);
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-07-01' } });
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-07-01' } });
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-07-03' } });
     await user.click(screen.getByRole('button', { name: 'Clear' }));
-    expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('From') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('To') as HTMLInputElement).value).toBe('');
   });
 });
