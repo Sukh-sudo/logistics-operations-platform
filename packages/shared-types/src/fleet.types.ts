@@ -1,4 +1,5 @@
 export type TruckStatus = 'AVAILABLE' | 'ASSIGNED' | 'IN_SERVICE' | 'MAINTENANCE' | 'OUT_OF_SERVICE';
+export type TruckPurpose = 'LAST_MILE' | 'MIDDLE_MILE';
 export type DriverStatus = 'AVAILABLE' | 'ASSIGNED' | 'ON_TRIP' | 'OFF_DUTY';
 export type EquipmentAssignmentStatus = 'ACTIVE' | 'RELEASED';
 
@@ -11,6 +12,7 @@ export interface FleetSnapshotDto<TStatus> {
 
 export interface TruckDto {
   id: string; unitNumber: string; licensePlate: string; status: TruckStatus;
+  purpose: TruckPurpose | null;
   year: number | null; make: string | null; model: string | null;
   terminal: { id: number; terminalCode: string; name: string } | null;
   snapshot: FleetSnapshotDto<TruckStatus> | null;

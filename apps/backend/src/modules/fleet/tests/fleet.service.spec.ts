@@ -1,5 +1,5 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
-import { DriverStatus, FleetEventType, TruckStatus } from '@prisma/client';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { DriverStatus, FleetEventType, TruckPurpose, TruckStatus } from '@prisma/client';
 import { FleetService } from '../services/fleet.service';
 
 describe('FleetService', () => {
@@ -13,6 +13,7 @@ describe('FleetService', () => {
     truckSnapshot: { create: jest.fn(), update: jest.fn() },
     driverSnapshot: { create: jest.fn(), update: jest.fn() },
     trailerSnapshot: { findUnique: jest.fn() },
+    fleetUnitSequence: { upsert: jest.fn() },
   };
   const prisma = {
     $transaction: jest.fn((callback) => callback(tx)),
@@ -69,11 +70,13 @@ describe('FleetService', () => {
 
   it('creates a truck, fleet event, and truck snapshot in one transaction', async () => {
     const createdAt = new Date();
-    tx.terminal.findUnique.mockResolvedValue({ id: 1 });
+    tx.terminal.findUnique.mockResolvedValue({ id: 1, terminalCode: 'cal' });
+    tx.fleetUnitSequence.upsert.mockResolvedValue({ lastNumber: 1 });
     tx.truck.findFirst.mockResolvedValue(null);
     tx.truck.create.mockResolvedValue({
       id: 'truck-1',
-      unitNumber: 'TRK-100',
+      unitNumber: 'LMCAL00001',
+      purpose: TruckPurpose.LAST_MILE,
       licensePlate: 'ABC-123',
       status: TruckStatus.AVAILABLE,
       terminalId: 1,
@@ -90,7 +93,7 @@ describe('FleetService', () => {
     });
 
     const result = await service.createTruck({
-      unitNumber: ' trk-100 ',
+      purpose: TruckPurpose.LAST_MILE,
       licensePlate: ' abc-123 ',
       terminalId: 1,
       year: 2024,
@@ -101,7 +104,8 @@ describe('FleetService', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.truck.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        unitNumber: 'TRK-100',
+        unitNumber: 'LMCAL00001',
+        purpose: TruckPurpose.LAST_MILE,
         licensePlate: 'ABC-123',
         status: TruckStatus.AVAILABLE,
       }),
@@ -110,6 +114,11 @@ describe('FleetService', () => {
       data: expect.objectContaining({
         truckId: 'truck-1',
         eventType: FleetEventType.TRUCK_CREATED,
+        payload: expect.objectContaining({
+          unitNumber: 'LMCAL00001',
+          purpose: TruckPurpose.LAST_MILE,
+          terminalCode: 'CAL',
+        }),
       }),
     });
     expect(tx.truckSnapshot.create).toHaveBeenCalledWith({
@@ -169,17 +178,36 @@ describe('FleetService', () => {
     expect(result.snapshot.currentStatus).toBe(DriverStatus.AVAILABLE);
   });
 
-  it('rejects duplicate truck identifiers before creating records', async () => {
+  it('rejects a duplicate license plate before creating records', async () => {
+    tx.terminal.findUnique.mockResolvedValue({ id: 1, terminalCode: 'CAL' });
+    tx.fleetUnitSequence.upsert.mockResolvedValue({ lastNumber: 2 });
     tx.truck.findFirst.mockResolvedValue({
       id: 'truck-1',
-      unitNumber: 'TRK-100',
-      licensePlate: 'XYZ-999',
+      unitNumber: 'LMCAL00001',
+      licensePlate: 'ABC-123',
     });
 
     await expect(
-      service.createTruck({ unitNumber: 'TRK-100', licensePlate: 'ABC-123' }),
+      service.createTruck({
+        purpose: TruckPurpose.LAST_MILE,
+        licensePlate: 'ABC-123',
+        terminalId: 1,
+      }),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.truck.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a terminal code that cannot form the three-letter unit segment', async () => {
+    tx.terminal.findUnique.mockResolvedValue({ id: 1, terminalCode: 'YYC-NORTH' });
+
+    await expect(
+      service.createTruck({
+        purpose: TruckPurpose.MIDDLE_MILE,
+        licensePlate: 'ABC-123',
+        terminalId: 1,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.fleetUnitSequence.upsert).not.toHaveBeenCalled();
   });
 
   it('rejects a fleet resource assigned to a missing terminal', async () => {

@@ -1,21 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import { TruckPurpose } from '@prisma/client';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class CreateTruckDto {
-  @ApiProperty({ example: 'TRK-1001' })
-  @IsString()
-  @IsNotEmpty()
-  unitNumber: string;
+  @ApiProperty({ enum: TruckPurpose, example: TruckPurpose.LAST_MILE })
+  @IsEnum(TruckPurpose)
+  purpose: TruckPurpose;
 
   @ApiProperty({ example: 'ABC-123' })
   @IsString()
   @IsNotEmpty()
   licensePlate: string;
 
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
+  @ApiProperty({ example: 1, description: 'Owning terminal used in the generated unit number.' })
   @IsInt()
-  terminalId?: number;
+  terminalId: number;
 
   @ApiPropertyOptional({ example: 2024 })
   @IsOptional()

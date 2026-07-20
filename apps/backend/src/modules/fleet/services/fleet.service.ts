@@ -1,5 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DriverStatus, EquipmentAssignmentStatus, FleetEventType, Prisma, TrailerStatus, TripStatus, TruckStatus } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { DriverStatus, EquipmentAssignmentStatus, FleetEventType, Prisma, TrailerStatus, TripStatus, TruckPurpose, TruckStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CreateDriverDto } from '../dto/create-driver.dto';
@@ -14,17 +14,18 @@ export class FleetService {
 
   async createTruck(dto: CreateTruckDto, requestId?: string) {
     const correlationId = requestId ?? randomUUID();
-    const unitNumber = this.normalize(dto.unitNumber);
     const licensePlate = this.normalize(dto.licensePlate);
 
     // A truck is created atomically with its immutable business event and read snapshot.
     return this.prisma.$transaction(async (tx) => {
-      await this.ensureTerminalExists(tx, dto.terminalId);
+      const terminal = await this.getUnitNumberTerminal(tx, dto.terminalId);
+      const unitNumber = await this.allocateUnitNumber(tx, dto.purpose, terminal);
       await this.ensureTruckIdentifiersAvailable(tx, unitNumber, licensePlate);
 
       const truck = await tx.truck.create({
         data: {
           unitNumber,
+          purpose: dto.purpose,
           licensePlate,
           terminalId: dto.terminalId,
           year: dto.year,
@@ -41,8 +42,10 @@ export class FleetService {
           correlationId,
           payload: {
             unitNumber,
+            purpose: dto.purpose,
             licensePlate,
             terminalId: truck.terminalId,
+            terminalCode: terminal.terminalCode,
             status: truck.status,
           },
         },
@@ -237,6 +240,46 @@ export class FleetService {
     if (terminalId === undefined) return;
     const terminal = await tx.terminal.findUnique({ where: { id: terminalId }, select: { id: true } });
     if (!terminal) throw new NotFoundException('Terminal not found');
+  }
+
+  private async getUnitNumberTerminal(tx: TransactionClient, terminalId: number) {
+    const terminal = await tx.terminal.findUnique({
+      where: { id: terminalId },
+      select: { id: true, terminalCode: true },
+    });
+    if (!terminal) throw new NotFoundException('Terminal not found');
+
+    const terminalCode = this.normalize(terminal.terminalCode);
+    if (!/^[A-Z]{3}$/.test(terminalCode)) {
+      throw new BadRequestException(
+        'Owning terminal code must contain exactly three letters for fleet unit numbering',
+      );
+    }
+
+    return { ...terminal, terminalCode };
+  }
+
+  private async allocateUnitNumber(
+    tx: TransactionClient,
+    purpose: TruckPurpose,
+    terminal: { id: number; terminalCode: string },
+  ) {
+    // The database counter is incremented inside the truck transaction, so a
+    // failed event or snapshot write also rolls the allocated number back.
+    const sequence = await tx.fleetUnitSequence.upsert({
+      where: {
+        terminalId_purpose: { terminalId: terminal.id, purpose },
+      },
+      create: { terminalId: terminal.id, purpose, lastNumber: 1 },
+      update: { lastNumber: { increment: 1 } },
+    });
+
+    if (sequence.lastNumber > 99_999) {
+      throw new ConflictException('Fleet unit number sequence is exhausted');
+    }
+
+    const purposePrefix = purpose === TruckPurpose.LAST_MILE ? 'LM' : 'MM';
+    return `${purposePrefix}${terminal.terminalCode}${sequence.lastNumber.toString().padStart(5, '0')}`;
   }
 
   private async ensureTruckIdentifiersAvailable(

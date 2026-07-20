@@ -29,6 +29,7 @@ export function FleetAssetDetailPage({ kind, id }: Props) {
     <header className="mt-5 flex items-start justify-between"><div><p className="text-sm font-medium text-brand-600">{kind === 'truck' ? 'Fleet vehicle' : 'Fleet driver'}</p><h2 className="mt-1 flex items-center gap-3 text-2xl font-semibold text-slate-900"><Icon className="h-6 w-6"/>{title}</h2><p className="mt-2 text-slate-500">Snapshot-backed availability and equipment assignment history.</p></div><StatusBadge value={data.snapshot?.currentStatus ?? data.status}/></header>
     <section className="mt-7 grid gap-4 md:grid-cols-3">
       <Detail label={kind === 'truck' ? 'License plate' : 'License number'} value={truck?.licensePlate ?? driver!.licenseNumber}/>
+      {truck && <Detail label="Purpose" value={truck.purpose?.replaceAll('_', ' ') ?? 'Legacy unit'}/>}
       <Detail label={kind === 'truck' ? 'Vehicle' : 'License class'} value={truck ? [truck.year, truck.make, truck.model].filter(Boolean).join(' ') || '—' : driver!.licenseClass}/>
       <Detail label="Current terminal" value={data.terminal ? `${data.terminal.terminalCode} — ${data.terminal.name}` : 'Unassigned'} icon={<Building2 className="h-4 w-4"/>}/>
       <Detail label="Assigned trip" value={data.snapshot?.assignedTripId ?? 'Unassigned'} link={data.snapshot?.assignedTripId ? `/trips/${data.snapshot.assignedTripId}` : undefined}/>

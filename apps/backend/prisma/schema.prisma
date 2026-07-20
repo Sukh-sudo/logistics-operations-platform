@@ -21,26 +21,27 @@ model PackageSnapshot {
 }
 
 model Terminal {
-  id                   Int               @id @default(autoincrement())
-  terminalCode         String            @unique
+  id                   Int                 @id @default(autoincrement())
+  terminalCode         String              @unique
   name                 String
   city                 String
   province             String
   country              String
   timezone             String
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
   events               TerminalEvent[]
   snapshot             TerminalSnapshot?
-  originatingRoutes    Route[]           @relation("RouteOriginTerminal")
-  destinationRoutes    Route[]           @relation("RouteDestinationTerminal")
+  originatingRoutes    Route[]             @relation("RouteOriginTerminal")
+  destinationRoutes    Route[]             @relation("RouteDestinationTerminal")
   routeStops           RouteStop[]
   tripStops            TripStop[]
-  originatingShipments Shipment[]        @relation("ShipmentOriginTerminal")
-  destinationShipments Shipment[]        @relation("ShipmentDestinationTerminal")
+  originatingShipments Shipment[]          @relation("ShipmentOriginTerminal")
+  destinationShipments Shipment[]          @relation("ShipmentDestinationTerminal")
   primaryUsers         User[]
   trucks               Truck[]
   drivers              Driver[]
+  fleetUnitSequences   FleetUnitSequence[]
 }
 
 model Route {
@@ -201,6 +202,7 @@ model ShipmentSnapshot {
 model Truck {
   id                   String                @id @default(cuid())
   unitNumber           String                @unique
+  purpose              TruckPurpose?
   licensePlate         String                @unique
   status               TruckStatus           @default(AVAILABLE)
   terminalId           Int?
@@ -216,6 +218,18 @@ model Truck {
 
   @@index([status])
   @@index([terminalId])
+}
+
+// Each terminal and purpose pair owns an independent five-digit unit sequence.
+// Keeping the counter in PostgreSQL prevents concurrent truck creation from
+// issuing the same operational identifier.
+model FleetUnitSequence {
+  terminalId Int
+  purpose    TruckPurpose
+  lastNumber Int          @default(0)
+  terminal   Terminal     @relation(fields: [terminalId], references: [id])
+
+  @@id([terminalId, purpose])
 }
 
 model Driver {
@@ -726,6 +740,11 @@ enum TruckStatus {
   IN_SERVICE
   MAINTENANCE
   OUT_OF_SERVICE
+}
+
+enum TruckPurpose {
+  LAST_MILE
+  MIDDLE_MILE
 }
 
 enum DriverStatus {

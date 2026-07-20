@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TruckPurpose } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
@@ -11,8 +11,21 @@ const prisma = new PrismaClient();
 describe('Trips (e2e)', () => {
   let app: INestApplication;
   let sequence = 0;
+  let terminalSequence = 0;
   const unique = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${sequence++}`;
-  const terminal = async () => (await request(app.getHttpServer()).post('/terminals').send({ terminalCode: unique('TT'), name: 'Trip terminal', city: 'Calgary', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton' }).expect(201)).body.terminal.id as number;
+  const terminal = async () => {
+    let terminalCode: string | undefined;
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    // Trip fixtures also need terminal codes that satisfy fleet unit numbering.
+    while (!terminalCode && terminalSequence < letters.length * letters.length) {
+      const current = terminalSequence++;
+      const candidate = `T${letters[Math.floor(current / letters.length)]}${letters[current % letters.length]}`;
+      const existing = await prisma.terminal.findUnique({ where: { terminalCode: candidate } });
+      if (!existing) terminalCode = candidate;
+    }
+    if (!terminalCode) throw new Error('Trip test terminal code space is exhausted');
+    return (await request(app.getHttpServer()).post('/terminals').send({ terminalCode, name: 'Trip terminal', city: 'Calgary', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton' }).expect(201)).body.terminal.id as number;
+  };
 
   beforeAll(async () => {
     const fixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -31,7 +44,7 @@ describe('Trips (e2e)', () => {
     const created = await request(app.getHttpServer()).post('/trips').send({ tripNumber: unique('TRIP'), routeId: route.id, plannedDeparture: new Date(Date.now() + 3600000).toISOString() }).expect(201);
     const tripId = created.body.trip.id;
     expect(created.body.stops).toHaveLength(3); expect(created.body.event.eventType).toBe('TRIP_CREATED'); expect(created.body.snapshot.totalStops).toBe(3);
-    const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ unitNumber: unique('TRK'), licensePlate: unique('PLT'), terminalId: originTerminalId }).expect(201)).body.truck;
+    const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ purpose: TruckPurpose.MIDDLE_MILE, licensePlate: unique('PLT'), terminalId: originTerminalId }).expect(201)).body.truck;
     const driver = (await request(app.getHttpServer()).post('/fleet/drivers').send({ employeeId: unique('DRV'), licenseNumber: unique('LIC'), licenseClass: 'Class 1', terminalId: originTerminalId }).expect(201)).body.driver;
     // Trailer fixtures must satisfy the documented TRLR + six digits identifier format.
     const trailer = (await request(app.getHttpServer()).post('/trailers').send({ trailerBarcode: trailerIdentifier() }).expect(201)).body.snapshot;

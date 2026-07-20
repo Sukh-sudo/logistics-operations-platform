@@ -15,9 +15,10 @@ describe('FleetAssetDetailPage', () => {
   });
 
   it('renders a truck snapshot and its immutable assignment history', async () => {
-    vi.mocked(fleetApi.truck).mockResolvedValue({ id: 'truck-1', unitNumber: 'TRK-100', licensePlate: 'ABC-123', status: 'ASSIGNED', year: 2025, make: 'Freightliner', model: 'Cascadia', terminal: { id: 1, terminalCode: 'YYC', name: 'Calgary' }, snapshot: { currentStatus: 'ASSIGNED', currentTerminalId: 1, assignedTripId: 'trip-1', lastActivityAt: '2026-07-12T12:00:00Z' } });
+    vi.mocked(fleetApi.truck).mockResolvedValue({ id: 'truck-1', unitNumber: 'LMCAL00001', purpose: 'LAST_MILE', licensePlate: 'ABC-123', status: 'ASSIGNED', year: 2025, make: 'Freightliner', model: 'Cascadia', terminal: { id: 1, terminalCode: 'CAL', name: 'Calgary' }, snapshot: { currentStatus: 'ASSIGNED', currentTerminalId: 1, assignedTripId: 'trip-1', lastActivityAt: '2026-07-12T12:00:00Z' } });
     renderPage(<FleetAssetDetailPage kind="truck" id="truck-1"/>);
-    expect(await screen.findByRole('heading', { name: /TRK-100/ })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /LMCAL00001/ })).toBeTruthy();
+    expect(screen.getByText('LAST MILE')).toBeTruthy();
     expect(screen.getByText('2025 Freightliner Cascadia')).toBeTruthy();
     expect(screen.getByText('TRIP-100')).toBeTruthy();
   });

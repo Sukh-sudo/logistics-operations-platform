@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TruckPurpose } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
@@ -11,11 +11,24 @@ const prisma = new PrismaClient();
 describe('Fleet (e2e)', () => {
   let app: INestApplication;
   let sequence = 0;
+  let terminalSequence = 0;
   const unique = (prefix: string) =>
     `${prefix}-${Date.now().toString(36)}-${sequence++}`;
 
+  const nextTerminalCode = async () => {
+    // Fleet unit identifiers require a stable three-letter terminal segment.
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    while (terminalSequence < letters.length * letters.length) {
+      const current = terminalSequence++;
+      const code = `F${letters[Math.floor(current / letters.length)]}${letters[current % letters.length]}`;
+      const existing = await prisma.terminal.findUnique({ where: { terminalCode: code } });
+      if (!existing) return code;
+    }
+    throw new Error('Fleet test terminal code space is exhausted');
+  };
+
   const createTerminal = async () => {
-    const code = unique('FLT');
+    const code = await nextTerminalCode();
     const response = await request(app.getHttpServer())
       .post('/terminals')
       .send({
@@ -63,13 +76,13 @@ describe('Fleet (e2e)', () => {
 
   it('creates, reads, and lists trucks with fleet events and snapshots', async () => {
     const terminalId = await createTerminal();
-    const unitNumber = unique('TRK');
     const licensePlate = unique('PLT');
+    const terminal = await prisma.terminal.findUniqueOrThrow({ where: { id: terminalId } });
 
     const created = await request(app.getHttpServer())
       .post('/fleet/trucks')
       .send({
-        unitNumber,
+        purpose: TruckPurpose.LAST_MILE,
         licensePlate,
         terminalId,
         year: 2024,
@@ -78,7 +91,10 @@ describe('Fleet (e2e)', () => {
       })
       .expect(201);
 
-    expect(created.body.truck.unitNumber).toBe(unitNumber.toUpperCase());
+    expect(created.body.truck).toMatchObject({
+      unitNumber: `LM${terminal.terminalCode}00001`,
+      purpose: TruckPurpose.LAST_MILE,
+    });
     expect(created.body.event.eventType).toBe('TRUCK_CREATED');
     expect(created.body.snapshot).toMatchObject({
       currentStatus: 'AVAILABLE',
@@ -98,6 +114,27 @@ describe('Fleet (e2e)', () => {
 
     const events = await prisma.fleetEvent.findMany({ where: { truckId } });
     expect(events.map((event) => event.eventType)).toEqual(['TRUCK_CREATED']);
+
+    // Middle-mile units have an independent sequence for the same owning terminal.
+    const middleMile = await request(app.getHttpServer())
+      .post('/fleet/trucks')
+      .send({
+        purpose: TruckPurpose.MIDDLE_MILE,
+        licensePlate: unique('MMPLT'),
+        terminalId,
+      })
+      .expect(201);
+    expect(middleMile.body.truck.unitNumber).toBe(`MM${terminal.terminalCode}00001`);
+
+    const nextLastMile = await request(app.getHttpServer())
+      .post('/fleet/trucks')
+      .send({
+        purpose: TruckPurpose.LAST_MILE,
+        licensePlate: unique('LMPLT'),
+        terminalId,
+      })
+      .expect(201);
+    expect(nextLastMile.body.truck.unitNumber).toBe(`LM${terminal.terminalCode}00002`);
   });
 
   it('creates, reads, and lists drivers with fleet events and snapshots', async () => {
@@ -139,16 +176,16 @@ describe('Fleet (e2e)', () => {
 
   it('rejects duplicate fleet identifiers and missing terminals', async () => {
     const terminalId = await createTerminal();
-    const unitNumber = unique('DUPTRK');
+    const licensePlate = unique('DUPPLT');
 
     await request(app.getHttpServer())
       .post('/fleet/trucks')
-      .send({ unitNumber, licensePlate: unique('DUPPLT'), terminalId })
+      .send({ purpose: TruckPurpose.LAST_MILE, licensePlate, terminalId })
       .expect(201);
 
     await request(app.getHttpServer())
       .post('/fleet/trucks')
-      .send({ unitNumber, licensePlate: unique('DUPPLT'), terminalId })
+      .send({ purpose: TruckPurpose.MIDDLE_MILE, licensePlate, terminalId })
       .expect(409);
 
     await request(app.getHttpServer())
@@ -168,7 +205,7 @@ describe('Fleet (e2e)', () => {
     const route = (await request(app.getHttpServer()).post('/routes').send({ routeNumber: unique('FLTR'), name: 'Fleet assignment route', originTerminalId, destinationTerminalId, estimatedDuration: 60 }).expect(201)).body.route;
     await request(app.getHttpServer()).post(`/routes/${route.id}/activate`).expect(201);
     const trip = (await request(app.getHttpServer()).post('/trips').send({ tripNumber: unique('FLTTRIP'), routeId: route.id, plannedDeparture: new Date(Date.now() + 3600000).toISOString() }).expect(201)).body.trip;
-    const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ unitNumber: unique('ATRK'), licensePlate: unique('APLT'), terminalId: originTerminalId }).expect(201)).body.truck;
+    const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ purpose: TruckPurpose.MIDDLE_MILE, licensePlate: unique('APLT'), terminalId: originTerminalId }).expect(201)).body.truck;
     const driver = (await request(app.getHttpServer()).post('/fleet/drivers').send({ employeeId: unique('ADRV'), licenseNumber: unique('ALIC'), licenseClass: 'Class 1', terminalId: originTerminalId }).expect(201)).body.driver;
     const trailerId = await createTrailer();
 
