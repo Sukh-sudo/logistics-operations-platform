@@ -5,7 +5,6 @@ import { AuthLayout } from '../layouts/AuthLayout';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
-import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { TransportationPage } from '../pages/TransportationPage';
@@ -22,6 +21,9 @@ import { TripDetailPage } from '../pages/TripDetailPage';
 import { ShipmentDetailPage } from '../pages/ShipmentDetailPage';
 import { TruckDetailPage } from '../pages/TruckDetailPage';
 import { DriverDetailPage } from '../pages/DriverDetailPage';
+import { PackageListPage } from '../pages/PackageListPage';
+import { ContainerListPage } from '../pages/ContainerListPage';
+import { TrailerListPage } from '../pages/TrailerListPage';
 
 export const router = createBrowserRouter([
   { element: <AuthLayout/>, children: [{ path: '/login', element: <LoginPage/> }] },
@@ -37,13 +39,16 @@ export const router = createBrowserRouter([
     { path: 'fleet/trucks/:truckId', element: <TruckDetailPage/> },
     { path: 'fleet/drivers/:driverId', element: <DriverDetailPage/> },
     { path: 'search', element: <SearchPage/> },
+    // Collection routes use the dashboard's snapshot-backed read APIs.
+    { path: 'packages', element: <PackageListPage/> },
+    { path: 'containers', element: <ContainerListPage/> },
+    { path: 'trailers', element: <TrailerListPage/> },
     { path: 'packages/:trackingNumber', element: <PackageDetailPage/> },
     { path: 'containers/:containerBarcode', element: <ContainerDetailPage/> },
     { path: 'trailers/:trailerBarcode', element: <TrailerDetailPage/> },
     { path: 'analytics', element: <AnalyticsPage/> },
     { path: 'events', element: <EventsPage/> },
     { path: 'health', element: <HealthPage/> },
-    ...['packages', 'containers', 'trailers'].map((path) => ({ path, element: <PlaceholderPage/> })),
   ] }] },
   { path: '*', element: <NotFoundPage/> },
 ]);

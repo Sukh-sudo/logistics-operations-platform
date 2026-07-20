@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
+import { trailerIdentifier } from './support/asset-identifiers';
 
 const prisma = new PrismaClient();
 
@@ -30,7 +31,8 @@ describe('Fleet (e2e)', () => {
   };
 
   const createTrailer = async () => {
-    const trailerBarcode = unique('TRL');
+    // Use the shared generator so this fixture always follows the trailer barcode contract.
+    const trailerBarcode = trailerIdentifier();
     const response = await request(app.getHttpServer())
       .post('/trailers')
       .send({ trailerBarcode })

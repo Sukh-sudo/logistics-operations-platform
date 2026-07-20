@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
+import { trailerIdentifier } from './support/asset-identifiers';
 
 const prisma = new PrismaClient();
 
@@ -32,7 +33,8 @@ describe('Trips (e2e)', () => {
     expect(created.body.stops).toHaveLength(3); expect(created.body.event.eventType).toBe('TRIP_CREATED'); expect(created.body.snapshot.totalStops).toBe(3);
     const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ unitNumber: unique('TRK'), licensePlate: unique('PLT'), terminalId: originTerminalId }).expect(201)).body.truck;
     const driver = (await request(app.getHttpServer()).post('/fleet/drivers').send({ employeeId: unique('DRV'), licenseNumber: unique('LIC'), licenseClass: 'Class 1', terminalId: originTerminalId }).expect(201)).body.driver;
-    const trailer = (await request(app.getHttpServer()).post('/trailers').send({ trailerBarcode: unique('TRL') }).expect(201)).body.snapshot;
+    // Trailer fixtures must satisfy the documented TRLR + six digits identifier format.
+    const trailer = (await request(app.getHttpServer()).post('/trailers').send({ trailerBarcode: trailerIdentifier() }).expect(201)).body.snapshot;
     await request(app.getHttpServer()).post('/fleet/assignments').send({ tripId, truckId: truck.id, driverId: driver.id, trailerId: trailer.id }).expect(201);
     await request(app.getHttpServer()).post(`/trips/${tripId}/start`).expect(201);
     await request(app.getHttpServer()).post(`/trips/${tripId}/stops/${created.body.stops[1].id}/arrive`).send({}).expect(409);
