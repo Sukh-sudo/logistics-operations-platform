@@ -16,6 +16,9 @@ describe('TerminalService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    terminalNameSequence: {
+      upsert: jest.fn(),
+    },
     terminalEvent: {
       create: jest.fn(),
     },
@@ -47,6 +50,10 @@ describe('TerminalService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    tx.terminalNameSequence.upsert.mockResolvedValue({
+      cityKey: 'calgary',
+      lastNumber: 0,
+    });
     service = new TerminalService(prisma as never);
   });
 
@@ -56,7 +63,7 @@ describe('TerminalService', () => {
     tx.terminal.create.mockResolvedValue({
       id: 1,
       terminalCode: 'YYC',
-      name: 'Calgary',
+      name: 'Calgary-000',
       city: 'Calgary',
       province: 'Alberta',
       country: 'Canada',
@@ -74,23 +81,32 @@ describe('TerminalService', () => {
 
     const result = await service.createTerminal({
       terminalCode: ' yyc ',
-      name: 'Calgary',
-      city: 'Calgary',
+      city: '  Calgary  ',
       province: 'Alberta',
       country: 'Canada',
       timezone: 'America/Edmonton',
     });
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.terminalNameSequence.upsert).toHaveBeenCalledWith({
+      where: { cityKey: 'calgary' },
+      create: { cityKey: 'calgary', lastNumber: 0 },
+      update: { lastNumber: { increment: 1 } },
+    });
     expect(tx.terminal.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ terminalCode: 'YYC' }),
+        data: expect.objectContaining({
+          terminalCode: 'YYC',
+          name: 'Calgary-000',
+          city: 'Calgary',
+        }),
       }),
     );
     expect(tx.terminalEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           eventType: TerminalEventType.TERMINAL_CREATED,
+          payload: expect.objectContaining({ name: 'Calgary-000' }),
         }),
       }),
     );
@@ -109,13 +125,69 @@ describe('TerminalService', () => {
     await expect(
       service.createTerminal({
         terminalCode: 'YYC',
-        name: 'Calgary',
         city: 'Calgary',
         province: 'Alberta',
         country: 'Canada',
         timezone: 'America/Edmonton',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rejects a city after its three-digit sequence is exhausted', async () => {
+    tx.terminal.findUnique.mockResolvedValue(null);
+    tx.terminalNameSequence.upsert.mockResolvedValue({
+      cityKey: 'calgary',
+      lastNumber: 1000,
+    });
+
+    await expect(
+      service.createTerminal({
+        terminalCode: 'YYC',
+        city: 'Calgary',
+        province: 'Alberta',
+        country: 'Canada',
+        timezone: 'America/Edmonton',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.terminal.create).not.toHaveBeenCalled();
+  });
+
+  it('allocates a new generated name when a terminal changes cities', async () => {
+    const createdAt = new Date();
+    tx.terminal.findUnique.mockResolvedValue({
+      id: 1,
+      name: 'Calgary-000',
+      city: 'Calgary',
+      snapshot: { currentStatus: TerminalStatus.ACTIVE },
+    });
+    tx.terminalNameSequence.upsert.mockResolvedValue({
+      cityKey: 'edmonton',
+      lastNumber: 4,
+    });
+    tx.terminal.update.mockResolvedValue({
+      id: 1,
+      name: 'Edmonton-004',
+      city: 'Edmonton',
+    });
+    tx.terminalEvent.create.mockResolvedValue({
+      eventType: TerminalEventType.TERMINAL_UPDATED,
+      createdAt,
+    });
+    tx.terminalSnapshot.update.mockResolvedValue({ terminalId: 1 });
+
+    const result = await service.updateTerminal(1, { city: ' Edmonton ' });
+
+    expect(tx.terminal.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: expect.objectContaining({ city: 'Edmonton', name: 'Edmonton-004' }),
+    });
+    expect(tx.terminalEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: TerminalEventType.TERMINAL_UPDATED,
+        payload: { city: ' Edmonton ', name: 'Edmonton-004' },
+      }),
+    });
+    expect(result.terminal.name).toBe('Edmonton-004');
   });
 
   it('rejects an empty terminal update', async () => {

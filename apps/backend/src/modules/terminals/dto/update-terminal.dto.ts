@@ -16,13 +16,6 @@ export class UpdateTerminalDto {
   @MaxLength(20)
   terminalCode?: string;
 
-  @ApiPropertyOptional({ example: 'Calgary Distribution Centre' })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
-  name?: string;
-
   @ApiPropertyOptional({ example: 'Calgary' })
   @IsOptional()
   @IsString()

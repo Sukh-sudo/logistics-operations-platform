@@ -24,7 +24,7 @@ describe('Trips (e2e)', () => {
       if (!existing) terminalCode = candidate;
     }
     if (!terminalCode) throw new Error('Trip test terminal code space is exhausted');
-    return (await request(app.getHttpServer()).post('/terminals').send({ terminalCode, name: 'Trip terminal', city: 'Calgary', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton' }).expect(201)).body.terminal.id as number;
+    return (await request(app.getHttpServer()).post('/terminals').send({ terminalCode, city: 'Calgary', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton' }).expect(201)).body.terminal.id as number;
   };
 
   beforeAll(async () => {

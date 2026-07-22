@@ -15,12 +15,6 @@ export class CreateTerminalDto {
   @MaxLength(20)
   terminalCode: string;
 
-  @ApiProperty({ example: 'Calgary Distribution Centre' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
-  name: string;
-
   @ApiProperty({ example: 'Calgary' })
   @IsString()
   @IsNotEmpty()

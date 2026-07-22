@@ -44,6 +44,7 @@ export class TerminalService {
   async createTerminal(dto: CreateTerminalDto, requestId?: string) {
     const correlationId = requestId ?? randomUUID();
     const terminalCode = this.normalizeCode(dto.terminalCode);
+    const city = this.normalizeText(dto.city);
 
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.terminal.findUnique({
@@ -54,11 +55,13 @@ export class TerminalService {
         throw new ConflictException('Terminal code already exists');
       }
 
+      const name = await this.nextTerminalName(tx, city);
+
       const terminal = await tx.terminal.create({
         data: {
           terminalCode,
-          name: dto.name.trim(),
-          city: dto.city.trim(),
+          name,
+          city,
           province: dto.province.trim(),
           country: dto.country.trim(),
           timezone: dto.timezone.trim(),
@@ -106,7 +109,13 @@ export class TerminalService {
     const correlationId = requestId ?? randomUUID();
 
     return this.prisma.$transaction(async (tx) => {
-      await this.getTerminalWithSnapshot(tx, terminalId);
+      const current = await this.getTerminalWithSnapshot(tx, terminalId);
+      const city = dto.city === undefined
+        ? undefined
+        : this.normalizeText(dto.city);
+      const name = city === undefined
+        ? undefined
+        : await this.nameForCityUpdate(tx, current.city, current.name, city);
 
       const terminal = await tx.terminal.update({
         where: { id: terminalId },
@@ -115,8 +124,10 @@ export class TerminalService {
             dto.terminalCode === undefined
               ? undefined
               : this.normalizeCode(dto.terminalCode),
-          name: dto.name?.trim(),
-          city: dto.city?.trim(),
+          // A city change allocates a new name in that city's sequence so a
+          // free-form update can never break the City-000 naming convention.
+          name,
+          city,
           province: dto.province?.trim(),
           country: dto.country?.trim(),
           timezone: dto.timezone?.trim(),
@@ -128,7 +139,7 @@ export class TerminalService {
           terminalId,
           eventType: TerminalEventType.TERMINAL_UPDATED,
           correlationId,
-          payload: this.toJson(dto),
+          payload: this.toJson({ ...dto, ...(name && { name }) }),
         },
       });
 
@@ -665,6 +676,47 @@ export class TerminalService {
 
   private normalizeCode(value: string) {
     return value.trim().toUpperCase();
+  }
+
+  private normalizeText(value: string) {
+    return value.trim().replace(/\s+/g, ' ');
+  }
+
+  private cityKey(city: string) {
+    return this.normalizeText(city).toLocaleLowerCase('en-CA');
+  }
+
+  private async nameForCityUpdate(
+    tx: TransactionClient,
+    currentCity: string,
+    currentName: string,
+    nextCity: string,
+  ) {
+    if (this.cityKey(currentCity) !== this.cityKey(nextCity)) {
+      return this.nextTerminalName(tx, nextCity);
+    }
+
+    // Preserve the existing sequence when only city spacing or casing changes.
+    const currentNumber = currentName.match(/-(\d{3})$/)?.[1];
+    return currentNumber
+      ? `${nextCity}-${currentNumber}`
+      : this.nextTerminalName(tx, nextCity);
+  }
+
+  /** Allocates the next three-digit display number for a normalized city. */
+  private async nextTerminalName(tx: TransactionClient, city: string) {
+    const cityKey = this.cityKey(city);
+    const sequence = await tx.terminalNameSequence.upsert({
+      where: { cityKey },
+      create: { cityKey, lastNumber: 0 },
+      update: { lastNumber: { increment: 1 } },
+    });
+
+    if (sequence.lastNumber > 999) {
+      throw new ConflictException(`Terminal name sequence exhausted for ${city}`);
+    }
+
+    return `${city}-${sequence.lastNumber.toString().padStart(3, '0')}`;
   }
 
   private toJson(value: object): Prisma.InputJsonValue {

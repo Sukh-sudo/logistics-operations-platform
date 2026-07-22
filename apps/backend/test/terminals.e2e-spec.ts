@@ -27,7 +27,6 @@ describe('Terminals (e2e)', () => {
       .post('/terminals')
       .send({
         terminalCode: code,
-        name: `${code} Distribution Centre`,
         city: 'Calgary',
         province: 'Alberta',
         country: 'Canada',
@@ -63,6 +62,7 @@ describe('Terminals (e2e)', () => {
     const response = await createTerminal(code);
 
     expect(response.body.terminal.terminalCode).toBe(code.toUpperCase());
+    expect(response.body.terminal.name).toMatch(/^Calgary-\d{3}$/);
     expect(response.body.snapshot.currentStatus).toBe('ACTIVE');
     expect(response.body.event.eventType).toBe('TERMINAL_CREATED');
 
@@ -78,13 +78,24 @@ describe('Terminals (e2e)', () => {
       .send({ terminalCode: 'INVALID' })
       .expect(400);
 
+    await request(app.getHttpServer())
+      .post('/terminals')
+      .send({
+        terminalCode: unique('NAME'),
+        name: 'Free-form terminal name',
+        city: 'Calgary',
+        province: 'Alberta',
+        country: 'Canada',
+        timezone: 'America/Edmonton',
+      })
+      .expect(400);
+
     const code = unique('DUP');
     await createTerminal(code);
     await request(app.getHttpServer())
       .post('/terminals')
       .send({
         terminalCode: code,
-        name: `${code} Distribution Centre`,
         city: 'Calgary',
         province: 'Alberta',
         country: 'Canada',
@@ -100,12 +111,12 @@ describe('Terminals (e2e)', () => {
     const updated = await request(app.getHttpServer())
       .patch(`/terminals/${terminalId}`)
       .send({
-        name: 'Updated Terminal',
+        city: 'Airdrie',
         status: 'MAINTENANCE',
       })
       .expect(200);
 
-    expect(updated.body.terminal.name).toBe('Updated Terminal');
+    expect(updated.body.terminal.name).toMatch(/^Airdrie-\d{3}$/);
     expect(updated.body.snapshot.currentStatus).toBe('MAINTENANCE');
     expect(updated.body.event.eventType).toBe('TERMINAL_UPDATED');
 

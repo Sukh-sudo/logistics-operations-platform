@@ -44,6 +44,14 @@ model Terminal {
   fleetUnitSequences   FleetUnitSequence[]
 }
 
+// Each normalized city owns a sequence used to generate readable terminal
+// names such as Calgary-000. Keeping it in PostgreSQL prevents duplicates
+// when terminals in the same city are created concurrently.
+model TerminalNameSequence {
+  cityKey    String @id
+  lastNumber Int    @default(-1)
+}
+
 model Route {
   id                    String         @id @default(cuid())
   routeNumber           String         @unique

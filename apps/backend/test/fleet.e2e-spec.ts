@@ -33,7 +33,6 @@ describe('Fleet (e2e)', () => {
       .post('/terminals')
       .send({
         terminalCode: code,
-        name: `${code} Terminal`,
         city: 'Calgary',
         province: 'Alberta',
         country: 'Canada',
