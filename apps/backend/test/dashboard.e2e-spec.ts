@@ -81,6 +81,30 @@ describe('Dashboard API (e2e)', () => {
     expect(Array.isArray(response.body)).toBe(true);
   });
 
+  it('should apply dashboard filters and validate status values', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/summary')
+      .query({ terminalId: 2147483647, packageStatus: 'DELIVERED', trailerStatus: 'CLOSED' })
+      .expect(200);
+
+    expect(response.body.packages.delivered).toBe(0);
+    expect(response.body.trailers.closed).toBe(0);
+
+    await request(app.getHttpServer())
+      .get('/dashboard/summary')
+      .query({ packageStatus: 'NOT_A_STATUS' })
+      .expect(400);
+  });
+
+  it('should apply an inclusive event date range', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/recent-events')
+      .query({ fromDate: '2999-01-01', toDate: '2999-01-01' })
+      .expect(200);
+
+    expect(response.body).toEqual([]);
+  });
+
   it('should update dashboard after creating package', async () => {
     const trackingNumber = packageIdentifier();
 

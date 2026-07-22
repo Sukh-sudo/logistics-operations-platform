@@ -1,5 +1,6 @@
-import {Controller, Get,} from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import {ApiOkResponse, ApiOperation, ApiTags,} from '@nestjs/swagger';
+import { DashboardQueryDto } from '../dto/dashboard-query.dto';
 import { DashboardService } from '../services/dashboard.service';
 
 @ApiTags('Dashboard')
@@ -16,8 +17,8 @@ export class DashboardController {
   description: 'Returns package, container and trailer summary statistics.',
 })
 @Get('summary')
-getSummary() {
-  return this.dashboardService.getSummary();
+getSummary(@Query() query: DashboardQueryDto) {
+  return this.dashboardService.getSummary(query);
 }
 
  @ApiOperation({
@@ -62,8 +63,8 @@ getPackages() {
   description: 'Returns the latest package, container and trailer events.',
 })
 @Get('recent-events')
-getRecentEvents() {
-  return this.dashboardService.getRecentEvents();
+getRecentEvents(@Query() query: DashboardQueryDto) {
+  return this.dashboardService.getRecentEvents(query);
 }
 
 }
