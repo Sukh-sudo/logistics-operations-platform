@@ -24,8 +24,8 @@ describe('DashboardPage filtering integration', () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(summary);
     vi.mocked(dashboardApi.events).mockResolvedValue([]);
     vi.mocked(dashboardApi.terminals).mockResolvedValue([
-      { id: 1, terminalCode: 'YYC', city: 'Calgary' },
-      { id: 2, terminalCode: 'YEG', city: 'Edmonton' },
+      { id: 1, terminalCode: 'TEST-CODE-ONE', name: 'Calgary-000', city: 'Calgary' },
+      { id: 2, terminalCode: 'TEST-CODE-TWO', name: 'Edmonton-000', city: 'Edmonton' },
     ]);
   });
 
@@ -33,6 +33,9 @@ describe('DashboardPage filtering integration', () => {
     const user = userEvent.setup();
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><DashboardPage/></QueryClientProvider>);
     await screen.findByText('Packages tracked');
+
+    expect(screen.getByRole('option', { name: 'Calgary-000' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /TEST-CODE/ })).toBeNull();
 
     fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-07-01' } });
     fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-07-22' } });

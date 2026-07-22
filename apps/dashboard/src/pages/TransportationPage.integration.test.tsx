@@ -7,9 +7,9 @@ import { transportationApi } from '../services/transportation.api';
 
 vi.mock('../services/transportation.api', () => ({ transportationApi: { terminals: vi.fn(), routes: vi.fn(), trips: vi.fn(), shipments: vi.fn() } }));
 const terminals = [
-  { id: 1, terminalCode: 'YYC', name: 'Calgary', city: 'Calgary', province: 'AB', country: 'CA', createdAt: '2026-07-01T10:00:00Z', snapshot: null },
-  { id: 2, terminalCode: 'YEG', name: 'Edmonton', city: 'Edmonton', province: 'AB', country: 'CA', createdAt: '2026-07-02T10:00:00Z', snapshot: null },
-  { id: 3, terminalCode: 'YVR', name: 'Vancouver', city: 'Vancouver', province: 'BC', country: 'CA', createdAt: '2026-07-02T10:00:00Z', snapshot: null },
+  { id: 1, terminalCode: 'TEST-CODE-ONE', name: 'Calgary-000', city: 'Calgary', province: 'AB', country: 'CA', createdAt: '2026-07-01T10:00:00Z', snapshot: null },
+  { id: 2, terminalCode: 'TEST-CODE-TWO', name: 'Edmonton-000', city: 'Edmonton', province: 'AB', country: 'CA', createdAt: '2026-07-02T10:00:00Z', snapshot: null },
+  { id: 3, terminalCode: 'TEST-CODE-THREE', name: 'Vancouver-000', city: 'Vancouver', province: 'BC', country: 'CA', createdAt: '2026-07-02T10:00:00Z', snapshot: null },
 ];
 const route = (id: string, origin: number, destination: number, createdAt: string) => ({ id, routeNumber: id, name: id, status: 'ACTIVE', estimatedDistance: 300, estimatedDuration: 200, createdAt, originTerminalId: origin, destinationTerminalId: destination, originTerminal: terminals.find(t => t.id === origin), destinationTerminal: terminals.find(t => t.id === destination), stops: [], snapshot: null });
 describe('TransportationPage filtering integration', () => {
@@ -18,6 +18,8 @@ describe('TransportationPage filtering integration', () => {
     const user = userEvent.setup();
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><TransportationPage/></QueryClientProvider>);
     await user.click(screen.getByRole('button', { name: /Routes/ }));
+    expect(screen.getAllByRole('option', { name: 'Calgary-000' })).toHaveLength(2);
+    expect(screen.queryByRole('option', { name: /TEST-CODE/ })).toBeNull();
     await screen.findAllByText('R-YYC-YEG'); expect(screen.getAllByText('R-YYC-YVR')).toHaveLength(2);
     fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-07-02' } });
     fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-07-02' } });

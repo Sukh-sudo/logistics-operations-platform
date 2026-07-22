@@ -7,4 +7,4 @@ export interface RecentEventDto { assetType: 'PACKAGE' | 'CONTAINER' | 'TRAILER'
 export interface DashboardTrailerDto { trailerBarcode: string; status: string; containerCount: number; packageCount: number; }
 export interface DashboardContainerDto { containerBarcode: string; status: string; packageCount: number; assignedTrailer: string | null; }
 export interface DashboardPackageDto { trackingNumber: string; status: string; containerBarcode: string | null; trailerBarcode: string | null; }
-export interface DashboardTerminalOptionDto { id: number; terminalCode: string; city: string; }
+export interface DashboardTerminalOptionDto { id: number; terminalCode: string; name: string; city: string; }
