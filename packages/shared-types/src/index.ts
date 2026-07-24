@@ -10,3 +10,4 @@ export * from './terminal.types.js';
 export * from './route.types.js';
 export * from './trip.types.js';
 export * from './shipment.types.js';
+export * from './reporting.types.js';

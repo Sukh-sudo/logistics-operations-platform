@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Container, HeartPulse, PackageSearch, Route, Search, TrendingUp, Truck } from 'lucide-react';
+import { Activity, BarChart3, Container, FileText, HeartPulse, MapPinned, PackageSearch, Route, Search, TrendingUp, Truck } from 'lucide-react';
 import { NavigationCard } from '../components/navigation/NavigationCard';
 import { useAuth } from '../hooks/useAuth';
 const cards = [
@@ -9,6 +9,8 @@ const cards = [
   { to: '/trailers', title: 'Trailer visibility', description: 'Explore trailer manifests, loads, and movement history.', icon: Truck, tone: 'bg-amber-50 text-amber-700' },
   { to: '/transportation', title: 'Transportation', description: 'Follow terminals, routes, trips, and shipment progress.', icon: Route, tone: 'bg-cyan-50 text-cyan-700' },
   { to: '/fleet', title: 'Fleet visibility', description: 'Monitor trucks, drivers, and trip equipment assignments.', icon: Truck, tone: 'bg-orange-50 text-orange-700' },
+  { to: '/tracking', title: 'Customer tracking', description: 'Find a shipment by number and follow delivery milestones.', icon: MapPinned, tone: 'bg-blue-50 text-blue-700' },
+  { to: '/reports', title: 'Delivery reports', description: 'Measure shipment completion and delivered package volume.', icon: FileText, tone: 'bg-fuchsia-50 text-fuchsia-700' },
   { to: '/events', title: 'Recent events', description: 'Follow the latest operational activity across the network.', icon: Activity, tone: 'bg-rose-50 text-rose-700' },
   { to: '/analytics', title: 'Analytics', description: 'Understand status distribution and operational trends.', icon: TrendingUp, tone: 'bg-indigo-50 text-indigo-700' },
   { to: '/health', title: 'System health', description: 'Check platform availability and connected services.', icon: HeartPulse, tone: 'bg-teal-50 text-teal-700' },

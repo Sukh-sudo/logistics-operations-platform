@@ -24,6 +24,8 @@ import { DriverDetailPage } from '../pages/DriverDetailPage';
 import { PackageListPage } from '../pages/PackageListPage';
 import { ContainerListPage } from '../pages/ContainerListPage';
 import { TrailerListPage } from '../pages/TrailerListPage';
+import { TrackingPage } from '../pages/TrackingPage';
+import { ReportsPage } from '../pages/ReportsPage';
 
 export const router = createBrowserRouter([
   { element: <AuthLayout/>, children: [{ path: '/login', element: <LoginPage/> }] },
@@ -47,6 +49,9 @@ export const router = createBrowserRouter([
     { path: 'containers/:containerBarcode', element: <ContainerDetailPage/> },
     { path: 'trailers/:trailerBarcode', element: <TrailerDetailPage/> },
     { path: 'analytics', element: <AnalyticsPage/> },
+    { path: 'tracking', element: <TrackingPage/> },
+    { path: 'tracking/:shipmentNumber', element: <TrackingPage/> },
+    { path: 'reports', element: <ReportsPage/> },
     { path: 'events', element: <EventsPage/> },
     { path: 'health', element: <HealthPage/> },
   ] }] },
