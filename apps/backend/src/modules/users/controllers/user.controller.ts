@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -14,6 +15,7 @@ import { CreatePermissionDto } from '../dto/create-permission.dto';
 import { CreateRoleDto } from '../dto/create-role.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { AssignTerminalDto } from '../dto/assign-terminal.dto';
+import { UpdateUserDto } from '../dto/update-user.dto';
 import {
   AssignPermissionDto,
   AssignRoleDto,
@@ -36,7 +38,7 @@ export class UserController {
     @Body() dto: CreateUserDto,
     @Req() request: RequestWithId,
   ) {
-    return this.userService.createUser(dto, request.requestId);
+    return this.userService.createUser(dto, request.correlationId ?? request.requestId);
   }
 
   @Get('users')
@@ -51,6 +53,21 @@ export class UserController {
     return this.userService.getUserHistory(id);
   }
 
+  @Patch('users/:id')
+  @Permissions(PERMISSIONS.USER_MANAGE)
+  updateUser(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.userService.updateUser(
+      id,
+      dto,
+      request.user?.userId,
+      request.correlationId ?? request.requestId,
+    );
+  }
+
   @Post('users/:id/activate')
   @Permissions(PERMISSIONS.USER_MANAGE)
   activateUser(
@@ -61,7 +78,7 @@ export class UserController {
     return this.userService.activateUser(
       id,
       dto.actorUserId,
-      request.requestId,
+      request.correlationId ?? request.requestId,
     );
   }
 
@@ -75,7 +92,7 @@ export class UserController {
     return this.userService.deactivateUser(
       id,
       dto.actorUserId,
-      request.requestId,
+      request.correlationId ?? request.requestId,
     );
   }
 
@@ -90,7 +107,7 @@ export class UserController {
       id,
       dto.terminalId,
       dto.actorUserId,
-      request.requestId,
+      request.correlationId ?? request.requestId,
     );
   }
 
@@ -105,7 +122,7 @@ export class UserController {
       id,
       dto.roleId,
       dto.actorUserId,
-      request.requestId,
+      request.correlationId ?? request.requestId,
     );
   }
 
@@ -121,7 +138,7 @@ export class UserController {
       id,
       roleId,
       dto.actorUserId,
-      request.requestId,
+      request.correlationId ?? request.requestId,
     );
   }
 
@@ -137,7 +154,7 @@ export class UserController {
     @Body() dto: CreateRoleDto,
     @Req() request: RequestWithId,
   ) {
-    return this.userService.createRole(dto, request.requestId);
+    return this.userService.createRole(dto, request.correlationId ?? request.requestId);
   }
 
   @Get('roles')
@@ -166,7 +183,7 @@ export class UserController {
       id,
       dto.permissionId,
       dto.actorUserId,
-      request.requestId,
+      request.correlationId ?? request.requestId,
     );
   }
 
@@ -176,7 +193,7 @@ export class UserController {
     @Body() dto: CreatePermissionDto,
     @Req() request: RequestWithId,
   ) {
-    return this.userService.createPermission(dto, request.requestId);
+    return this.userService.createPermission(dto, request.correlationId ?? request.requestId);
   }
 
   @Get('permissions')

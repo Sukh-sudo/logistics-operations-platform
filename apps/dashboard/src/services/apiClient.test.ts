@@ -31,12 +31,30 @@ describe('apiClient authentication recovery', () => {
 
     expect(response.data.ok).toBe(true);
     expect(refresh).toHaveBeenCalledWith(
-      'http://localhost:3000/auth/refresh',
+      'http://localhost:3000/api/v1/auth/refresh',
       { refreshToken: 'refresh-one' },
       { timeout: 15_000 },
     );
     expect(authorizations).toEqual(['Bearer expired-access', 'Bearer fresh-access']);
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBe('fresh-access');
     expect(localStorage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh-two');
+  });
+
+  it('unwraps the platform success envelope for domain API services', async () => {
+    apiClient.defaults.adapter = (async config => ({
+      data: {
+        success: true,
+        data: { trackingNumber: 'CON1234567' },
+        timestamp: '2026-07-24T12:00:00.000Z',
+      },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    })) as AxiosAdapter;
+
+    const response = await apiClient.get<{ trackingNumber: string }>('/search');
+
+    expect(response.data).toEqual({ trackingNumber: 'CON1234567' });
   });
 });

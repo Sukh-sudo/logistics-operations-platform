@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PackageEventType, PackageStatus, Prisma, ShipmentEventType, ShipmentStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -6,13 +6,12 @@ import { NotificationService } from '../../notifications/services/notification.s
 import { CreateShipmentDto } from '../dto/create-shipment.dto';
 import { ShipmentPackageDto } from '../dto/shipment-package.dto';
 import { UpdateShipmentDto } from '../dto/update-shipment.dto';
+import { logApplicationEvent } from '../../../common/utils/logger';
 
 type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class ShipmentService {
-  private readonly logger = new Logger(ShipmentService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
@@ -346,10 +345,11 @@ export class ShipmentService {
     try {
       await this.notificationService.createFromShipmentEvent(source);
     } catch (error) {
-      this.logger.error(
-        `Notification generation failed for shipment event ${source.event.id}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      logApplicationEvent('error', ShipmentService.name, 'Notification generation failed', {
+        correlationId: source.event.correlationId,
+        shipmentEventId: source.event.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 

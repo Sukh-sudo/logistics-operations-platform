@@ -11,7 +11,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 // Kafka publishing service
 import { KafkaService } from '../../../infrastructure/kafka/kafka.service';
 import { CreatePackageEventDto } from '../dto/create-package-event.dto';
-import { AppLogger } from '../../../common/utils/logger';
+import { logApplicationEvent } from '../../../common/utils/logger';
 import { PackageTransitionValidator } from '../validators/package-transition.validator';
 import { packageTypeFromIdentifier } from '../../../common/domain/asset-identifiers';
 import { ShipmentService } from '../../shipments/services/shipment.service';
@@ -36,9 +36,12 @@ export class PackageService {
     const correlationId = requestId ?? randomUUID();
 
     // Log workflow start
-    AppLogger.log(
-  `[${correlationId}] Processing package event: ${dto.eventType}`,
-    );
+    logApplicationEvent('log', PackageService.name, 'Processing package event', {
+      requestId,
+      correlationId,
+      eventType: dto.eventType,
+      trackingNumber: dto.trackingNumber,
+    });
   // Execute DB operations inside transaction
   const result = await this.prisma.$transaction(async (tx) => {
 
@@ -51,7 +54,6 @@ export class PackageService {
 
         // Skip validation on first scan
      if (snapshot) {
-      console.log('Current Status:',snapshot.currentStatus,'Next Event:',dto.eventType,);
       this.transitionValidator.validateTransition(
       snapshot.currentStatus,
       dto.eventType,
@@ -104,9 +106,11 @@ export class PackageService {
       });
 
         // Log snapshot creation
-        AppLogger.log(
-          `Created snapshot for ${dto.trackingNumber}`,
-        );
+        logApplicationEvent('log', PackageService.name, 'Created package snapshot', {
+          requestId,
+          correlationId,
+          trackingNumber: dto.trackingNumber,
+        });
       }
     const nextStatus = this.statusForEvent(dto.eventType);
     const terminalDepartureEvents: PackageEventType[] = [
@@ -283,9 +287,12 @@ export class PackageService {
   });
 
   // Log Kafka publication attempt
-    AppLogger.log(
-    `[${correlationId}] Publishing package event to Kafka`,
-    );
+    logApplicationEvent('log', PackageService.name, 'Publishing package event', {
+      requestId,
+      correlationId,
+      trackingNumber: dto.trackingNumber,
+      eventType: dto.eventType,
+    });
 
   // Publish Kafka event AFTER successful transaction commit
   await this.kafkaService.publish('package-events', {

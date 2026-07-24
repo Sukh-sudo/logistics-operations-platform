@@ -1,5 +1,4 @@
 import { NestFactory } from '@nestjs/core';
-import {ValidationPipe,} from '@nestjs/common';
 
 // Swagger imports
 import {
@@ -10,7 +9,8 @@ import {
 import { AppModule } from './app.module';
 
 // Import Prisma exception filter
-import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { configureApplication } from './configure-application';
+import { logApplicationEvent } from './common/utils/logger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -22,20 +22,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Enable global DTO validation
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-
-  // Register global Prisma exception handling
-  app.useGlobalFilters(
-    new PrismaExceptionFilter(),
-  );
+  configureApplication(app);
 
   // Configure Swagger documentation
   const config = new DocumentBuilder()
@@ -52,13 +39,10 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3000);
 
-   console.log(
-    `Application running on: http://localhost:${process.env.PORT ?? 3000}`,
-  );
-
-  console.log(
-    `Swagger docs: http://localhost:${process.env.PORT ?? 3000}/api/docs`,
-  );
+  logApplicationEvent('log', 'Bootstrap', 'Application started', {
+    port: process.env.PORT ?? 3000,
+    swaggerPath: '/api/docs',
+  });
 }
 
 bootstrap();

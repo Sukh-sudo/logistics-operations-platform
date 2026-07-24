@@ -2,12 +2,13 @@ import { Type } from 'class-transformer';
 import { IsDateString, IsEnum, IsInt, IsOptional, Matches, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PackageStatus, TrailerStatus } from '@prisma/client';
+import { ListQueryDto } from '../../../common/dto/list-query.dto';
 
 /**
  * Optional filters shared by the dashboard summary and recent-activity reads.
  * Calendar dates are interpreted as inclusive UTC days by DashboardService.
  */
-export class DashboardQueryDto {
+export class DashboardQueryDto extends ListQueryDto {
   @ApiPropertyOptional({ example: '2026-07-01', format: 'date' })
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)

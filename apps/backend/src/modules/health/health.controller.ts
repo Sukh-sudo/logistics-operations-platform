@@ -1,33 +1,60 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
-import { KafkaService } from '../../infrastructure/kafka/kafka.service';
+import { HealthService } from './health.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly kafka: KafkaService,
-  ) {}
+  constructor(private readonly health: HealthService) {}
 
   @Get()
   @Public()
   async getHealth() {
-    let database: 'connected' | 'unavailable' = 'connected';
-    try {
-      await this.prisma.$queryRaw`SELECT 1`;
-    } catch {
-      database = 'unavailable';
-    }
-
+    const readiness = await this.health.readiness();
     const result = {
-      status: database === 'connected' ? 'ok' : 'degraded',
-      database,
-      kafka: this.kafka.isHealthy() ? 'connected' : 'unavailable',
-      uptime: Math.floor(process.uptime()),
-      timestamp: new Date().toISOString(),
+      status: readiness.ready
+        ? readiness.kafka.status === 'connected' ? 'ok' : 'degraded'
+        : 'unavailable',
+      database: readiness.database.status,
+      databaseLatencyMs: readiness.database.latencyMs,
+      kafka: readiness.kafka.status,
+      uptime: readiness.uptime,
+      timestamp: readiness.timestamp,
     };
-    if (database === 'unavailable') {
+    if (!readiness.ready) {
+      throw new ServiceUnavailableException(result);
+    }
+    return result;
+  }
+
+  @Get('live')
+  @Public()
+  getLiveness() {
+    return this.health.liveness();
+  }
+
+  @Get('ready')
+  @Public()
+  async getReadiness() {
+    const result = await this.health.readiness();
+    if (!result.ready) throw new ServiceUnavailableException(result);
+    return result;
+  }
+
+  @Get('database')
+  @Public()
+  async getDatabaseHealth() {
+    const result = await this.health.database();
+    if (result.status === 'unavailable') {
+      throw new ServiceUnavailableException(result);
+    }
+    return result;
+  }
+
+  @Get('kafka')
+  @Public()
+  getKafkaHealth() {
+    const result = this.health.kafkaStatus();
+    if (result.status === 'unavailable') {
       throw new ServiceUnavailableException(result);
     }
     return result;

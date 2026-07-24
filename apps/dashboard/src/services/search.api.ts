@@ -2,7 +2,7 @@ import type { SearchResultDto } from '@logistics/shared-types';
 import { apiClient } from './apiClient';
 
 export const searchApi = {
-  // Encoding keeps scanned identifiers safe when they contain URL-reserved characters.
+  // The query route is the canonical search contract; Axios safely encodes it.
   findByBarcode: async (barcode: string) =>
-    (await apiClient.get<SearchResultDto>(`/search/${encodeURIComponent(barcode)}`)).data,
+    (await apiClient.get<SearchResultDto>('/search', { params: { q: barcode } })).data,
 };

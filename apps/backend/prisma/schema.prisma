@@ -953,6 +953,7 @@ enum UserStatus {
 
 enum UserEventType {
   USER_CREATED
+  USER_UPDATED
   ROLE_ASSIGNED
   ROLE_REMOVED
   USER_ACTIVATED

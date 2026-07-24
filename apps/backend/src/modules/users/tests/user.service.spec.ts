@@ -215,6 +215,70 @@ describe('UserService', () => {
     expect(result.snapshot.currentTerminalId).toBe(7);
   });
 
+  it('updates the user aggregate, event stream, and snapshot atomically', async () => {
+    const createdAt = new Date();
+    tx.userSnapshot.findUnique.mockResolvedValue({
+      userId: 'user-1',
+      email: 'old@example.com',
+      firstName: 'Taylor',
+      lastName: 'Morgan',
+    });
+    tx.user.findFirst.mockResolvedValue(null);
+    tx.user.update.mockResolvedValue({
+      id: 'user-1',
+      email: 'new@example.com',
+      firstName: 'Casey',
+      lastName: 'Morgan',
+    });
+    tx.userEvent.create.mockResolvedValue({
+      id: 'event-update',
+      eventType: UserEventType.USER_UPDATED,
+      createdAt,
+    });
+    tx.userSnapshot.update.mockResolvedValue({
+      userId: 'user-1',
+      email: 'new@example.com',
+      firstName: 'Casey',
+      lastName: 'Morgan',
+    });
+
+    const result = await service.updateUser(
+      'user-1',
+      { email: ' NEW@example.com ', firstName: ' Casey ' },
+      'admin-1',
+      'correlation-1',
+    );
+
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        email: 'new@example.com',
+        firstName: 'Casey',
+        lastName: 'Morgan',
+      },
+    });
+    expect(tx.userEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: UserEventType.USER_UPDATED,
+        actorUserId: 'admin-1',
+        correlationId: 'correlation-1',
+        payload: expect.objectContaining({
+          changedFields: ['email', 'firstName'],
+        }),
+      }),
+    });
+    expect(tx.userSnapshot.update).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      data: {
+        email: 'new@example.com',
+        firstName: 'Casey',
+        lastName: 'Morgan',
+        lastActivityAt: createdAt,
+      },
+    });
+    expect(result.event.eventType).toBe(UserEventType.USER_UPDATED);
+  });
+
   it('assigns a role and derives additive permissions into the snapshot', async () => {
     const createdAt = new Date();
     tx.userSnapshot.findUnique.mockResolvedValue({

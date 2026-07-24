@@ -33,12 +33,12 @@ export class NotificationController {
   @Patch(':id/read')
   @ApiOperation({ summary: 'Mark a notification as read' })
   markRead(@Param('id') id: string, @Req() req: RequestWithId) {
-    return this.service.markRead(id, req.requestId);
+    return this.service.markRead(id, req.correlationId ?? req.requestId);
   }
 
   @Post(':id/resend')
   @ApiOperation({ summary: 'Request another in-app delivery attempt' })
   resend(@Param('id') id: string, @Req() req: RequestWithId) {
-    return this.service.resend(id, req.requestId);
+    return this.service.resend(id, req.correlationId ?? req.requestId);
   }
 }

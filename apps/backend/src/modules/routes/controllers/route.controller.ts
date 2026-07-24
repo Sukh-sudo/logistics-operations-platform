@@ -20,7 +20,7 @@ export class RouteController {
 
   @Post()
   create(@Body() dto: CreateRouteDto, @Req() request: RequestWithId) {
-    return this.routeService.createRoute(dto, request.requestId);
+    return this.routeService.createRoute(dto, request.correlationId ?? request.requestId);
   }
 
   @Get()
@@ -30,12 +30,12 @@ export class RouteController {
 
   @Post(':id/activate')
   activate(@Param('id') id: string, @Req() request: RequestWithId) {
-    return this.routeService.activateRoute(id, request.requestId);
+    return this.routeService.activateRoute(id, request.correlationId ?? request.requestId);
   }
 
   @Post(':id/retire')
   retire(@Param('id') id: string, @Req() request: RequestWithId) {
-    return this.routeService.retireRoute(id, request.requestId);
+    return this.routeService.retireRoute(id, request.correlationId ?? request.requestId);
   }
 
   @Post(':id/stops')
@@ -44,7 +44,7 @@ export class RouteController {
     @Body() dto: AddStopDto,
     @Req() request: RequestWithId,
   ) {
-    return this.routeService.addStop(id, dto, request.requestId);
+    return this.routeService.addStop(id, dto, request.correlationId ?? request.requestId);
   }
 
   @Delete(':id/stops/:stopId')
@@ -53,7 +53,7 @@ export class RouteController {
     @Param('stopId') stopId: string,
     @Req() request: RequestWithId,
   ) {
-    return this.routeService.removeStop(id, stopId, request.requestId);
+    return this.routeService.removeStop(id, stopId, request.correlationId ?? request.requestId);
   }
 
   @Patch(':id')
@@ -62,7 +62,7 @@ export class RouteController {
     @Body() dto: UpdateRouteDto,
     @Req() request: RequestWithId,
   ) {
-    return this.routeService.updateRoute(id, dto, request.requestId);
+    return this.routeService.updateRoute(id, dto, request.correlationId ?? request.requestId);
   }
 
   @Get(':id')

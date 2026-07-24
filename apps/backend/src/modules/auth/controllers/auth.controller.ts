@@ -14,13 +14,13 @@ export class AuthController {
   @Post('login')
   @Public()
   login(@Body() dto: LoginDto, @Req() request: AuthenticatedRequest) {
-    return this.authService.login(dto, request.requestId);
+    return this.authService.login(dto, request.correlationId ?? request.requestId);
   }
 
   @Post('refresh')
   @Public()
   refresh(@Body() dto: RefreshTokenDto, @Req() request: AuthenticatedRequest) {
-    return this.authService.refresh(dto.refreshToken, request.requestId);
+    return this.authService.refresh(dto.refreshToken, request.correlationId ?? request.requestId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -29,7 +29,7 @@ export class AuthController {
     return this.authService.logout(
       request.user.userId,
       dto.refreshToken,
-      request.requestId,
+      request.correlationId ?? request.requestId,
     );
   }
 
@@ -42,7 +42,7 @@ export class AuthController {
     return this.authService.changePassword(
       request.user.userId,
       dto,
-      request.requestId,
+      request.correlationId ?? request.requestId,
     );
   }
 

@@ -1623,7 +1623,37 @@ Resource names remain plural.
 
 ## Response Standards
 
-Success
+Successful values use a standard envelope.
+
+```json
+{
+  "success": true,
+  "data": {},
+  "timestamp": "2026-07-24T15:30:00.000Z",
+  "requestId": "4cbd615e-6ea8-4e97-ad10-e353c6e56d64"
+}
+```
+
+Errors use a standard envelope.
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Resource not found."
+  },
+  "timestamp": "2026-07-24T15:30:00.000Z",
+  "path": "/api/v1/resource",
+  "requestId": "4cbd615e-6ea8-4e97-ad10-e353c6e56d64"
+}
+```
+
+Array responses support opt-in exact filtering, sorting, and pagination with
+`page`, `pageSize`, and `sort`. Existing callers that omit collection controls
+receive the complete collection inside `data`.
+
+Success status codes
 
 ```
 200 OK
@@ -1661,15 +1691,16 @@ Server Errors
 
 ## Versioning
 
-Future strategy
+Current strategy
 
 ```
 /api/v1/
 
-/api/v2/
+unversioned compatibility routes
 ```
 
-Breaking changes require a new API version.
+New clients should use `/api/v1`. Existing unversioned clients remain
+compatible. Breaking changes require a new API version such as `/api/v2`.
 
 ---
 

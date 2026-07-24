@@ -12,7 +12,7 @@ export class FleetController {
 
   @Post('trucks')
   createTruck(@Body() dto: CreateTruckDto, @Req() request: RequestWithId) {
-    return this.fleetService.createTruck(dto, request.requestId);
+    return this.fleetService.createTruck(dto, request.correlationId ?? request.requestId);
   }
 
   @Get('trucks')
@@ -27,7 +27,7 @@ export class FleetController {
 
   @Post('drivers')
   createDriver(@Body() dto: CreateDriverDto, @Req() request: RequestWithId) {
-    return this.fleetService.createDriver(dto, request.requestId);
+    return this.fleetService.createDriver(dto, request.correlationId ?? request.requestId);
   }
 
   @Get('drivers')
@@ -47,7 +47,7 @@ export class FleetController {
 
   @Post('assignments')
   assignEquipment(@Body() dto: AssignEquipmentDto, @Req() request: RequestWithId) {
-    return this.fleetService.assignEquipment(dto, request.requestId);
+    return this.fleetService.assignEquipment(dto, request.correlationId ?? request.requestId);
   }
 
   @Get('assignments')
@@ -57,6 +57,6 @@ export class FleetController {
 
   @Post('assignments/:id/release')
   releaseEquipment(@Param('id') id: string, @Req() request: RequestWithId) {
-    return this.fleetService.releaseEquipment(id, request.requestId);
+    return this.fleetService.releaseEquipment(id, request.correlationId ?? request.requestId);
   }
 }

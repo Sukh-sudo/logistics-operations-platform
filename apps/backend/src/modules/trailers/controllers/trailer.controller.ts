@@ -18,7 +18,7 @@ export class TrailerController {
     @Body() dto: CreateTrailerDto,
     @Req() req: RequestWithId,
   ) {
-    return this.trailerService.createTrailer(dto, req.requestId);
+    return this.trailerService.createTrailer(dto, req.correlationId ?? req.requestId);
   }
 
   @Post(':trailerId/load-container')
@@ -30,7 +30,7 @@ loadContainer(
   return this.trailerService.loadContainer(
     trailerId,
     dto,
-    req.requestId,
+    req.correlationId ?? req.requestId,
   );
 }
 
@@ -43,7 +43,7 @@ unloadContainer(
   return this.trailerService.unloadContainer(
     trailerId,
     dto,
-    req.requestId,
+    req.correlationId ?? req.requestId,
   );
 }
 
@@ -56,7 +56,7 @@ loadPackage(
   return this.trailerService.loadPackage(
     trailerId,
     dto,
-    req.requestId,
+    req.correlationId ?? req.requestId,
   );
 }
 
@@ -69,7 +69,7 @@ unloadPackage(
   return this.trailerService.unloadPackage(
     trailerId,
     dto,
-    req.requestId,
+    req.correlationId ?? req.requestId,
   );
 }
 

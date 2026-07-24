@@ -64,6 +64,15 @@ describe('Search API (e2e)', () => {
     expect(
       response.body.data.trackingNumber,
     ).toBe(trackingNumber);
+
+    const canonical = await request(app.getHttpServer())
+      .get('/search')
+      .query({ q: trackingNumber, type: 'PACKAGE' })
+      .expect(200);
+    expect(canonical.body).toMatchObject({
+      type: 'PACKAGE',
+      data: { trackingNumber },
+    });
   });
 
   it('should find container by barcode', async () => {

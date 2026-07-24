@@ -1,18 +1,13 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import {
   Kafka,
   Producer,
 } from 'kafkajs';
+import { logApplicationEvent } from '../../common/utils/logger';
 
 @Injectable()
 export class KafkaService implements OnModuleInit {
-  private readonly logger = new Logger(KafkaService.name);
-
   // Kafka producer instance
   private producer: Producer | null = null;
 
@@ -44,23 +39,22 @@ export class KafkaService implements OnModuleInit {
       // Mark Kafka as available
       this.isConnected = true;
 
-      this.logger.log('Kafka producer connected');
+      logApplicationEvent('log', KafkaService.name, 'Kafka producer connected');
     } catch (error) {
       // Gracefully continue without Kafka
       this.isConnected = false;
 
-      this.logger.warn(
-        'Kafka broker unavailable. Running without event streaming.',
-      );
+      logApplicationEvent('warn', KafkaService.name, 'Kafka broker unavailable; running without event streaming');
     }
   }
 
   async publish(topic: string, message: unknown) {
     // Skip publishing if Kafka unavailable
     if (!this.producer || !this.isConnected) {
-      this.logger.warn(
-        `Skipping Kafka publish for topic: ${topic}`,
-      );
+      logApplicationEvent('warn', KafkaService.name, 'Skipping Kafka publish because the broker is unavailable', {
+        topic,
+        correlationId: this.correlationId(message),
+      });
 
       return;
     }
@@ -77,13 +71,21 @@ export class KafkaService implements OnModuleInit {
       });
     } catch (error) {
       // Prevent Kafka failures from crashing operational workflow
-      this.logger.error(
-        `Failed to publish Kafka event for topic: ${topic}`,
-      );
+      logApplicationEvent('error', KafkaService.name, 'Kafka event publication failed', {
+        topic,
+        correlationId: this.correlationId(message),
+      });
     }
   }
 
   isHealthy() {
     return this.isConnected;
+  }
+
+  private correlationId(message: unknown) {
+    if (message && typeof message === 'object' && 'requestId' in message) {
+      return String(message.requestId);
+    }
+    return null;
   }
 }

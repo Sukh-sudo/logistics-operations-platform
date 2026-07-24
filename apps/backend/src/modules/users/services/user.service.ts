@@ -19,6 +19,7 @@ import { CreateRoleDto } from '../dto/create-role.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { BootstrapAdminDto } from '../dto/bootstrap-admin.dto';
 import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { UpdateUserDto } from '../dto/update-user.dto';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -186,6 +187,69 @@ export class UserService {
     return this.prisma.userEvent.findMany({
       where: { userId },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * Profile edits remain event-driven: the aggregate, immutable audit event,
+   * and disposable user snapshot are changed in the same Prisma transaction.
+   */
+  async updateUser(
+    userId: string,
+    dto: UpdateUserDto,
+    actorUserId?: string,
+    requestId?: string,
+  ) {
+    const correlationId = requestId ?? randomUUID();
+    if (dto.email === undefined && dto.firstName === undefined && dto.lastName === undefined) {
+      throw new BadRequestException('At least one profile field is required');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const current = await this.requireUserSnapshot(tx, userId);
+      const email = dto.email === undefined ? current.email : this.normalizeEmail(dto.email);
+      const firstName = dto.firstName === undefined ? current.firstName : dto.firstName.trim();
+      const lastName = dto.lastName === undefined ? current.lastName : dto.lastName.trim();
+
+      if (email !== current.email) {
+        const duplicate = await tx.user.findFirst({
+          where: { email, NOT: { id: userId } },
+        });
+        if (duplicate) throw new ConflictException('User email already exists');
+      }
+
+      const changedFields = [
+        ...(email !== current.email ? ['email'] : []),
+        ...(firstName !== current.firstName ? ['firstName'] : []),
+        ...(lastName !== current.lastName ? ['lastName'] : []),
+      ];
+      if (changedFields.length === 0) {
+        throw new BadRequestException('Profile values are unchanged');
+      }
+
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { email, firstName, lastName },
+      });
+      const event = await tx.userEvent.create({
+        data: {
+          userId,
+          eventType: UserEventType.USER_UPDATED,
+          actorUserId,
+          correlationId,
+          payload: { changedFields, email, firstName, lastName },
+        },
+      });
+      const snapshot = await tx.userSnapshot.update({
+        where: { userId },
+        data: {
+          email,
+          firstName,
+          lastName,
+          lastActivityAt: event.createdAt,
+        },
+      });
+      return { user, snapshot, event };
     });
   }
 

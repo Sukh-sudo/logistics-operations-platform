@@ -1,4 +1,5 @@
 export * from './auth.types.js';
+export * from './api.types.js';
 export * from './container.types.js';
 export * from './dashboard.types.js';
 export * from './health.types.js';

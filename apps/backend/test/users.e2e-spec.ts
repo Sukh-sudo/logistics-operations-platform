@@ -80,6 +80,17 @@ describe('Users (e2e)', () => {
     expect(created.body.snapshot.currentStatus).toBe('INACTIVE');
     expect(created.body.events[0].eventType).toBe('USER_CREATED');
 
+    const updated = await request(app.getHttpServer())
+      .patch(`/users/${userId}`)
+      .set('Authorization', authorization)
+      .send({
+        email: `${unique('updated')}@example.com`,
+        firstName: 'Casey',
+      })
+      .expect(200);
+    expect(updated.body.snapshot.firstName).toBe('Casey');
+    expect(updated.body.event.eventType).toBe('USER_UPDATED');
+
     const terminal = await request(app.getHttpServer())
       .post('/terminals')
       .set('Authorization', authorization)
@@ -130,7 +141,7 @@ describe('Users (e2e)', () => {
       .set('Authorization', authorization)
       .expect(200);
     expect(history.body.map((event: { eventType: string }) => event.eventType))
-      .toEqual(['USER_CREATED', 'TERMINAL_ASSIGNED', 'USER_ACTIVATED', 'ROLE_ASSIGNED']);
+      .toEqual(['USER_CREATED', 'USER_UPDATED', 'TERMINAL_ASSIGNED', 'USER_ACTIVATED', 'ROLE_ASSIGNED']);
 
     await request(app.getHttpServer())
       .delete(`/users/${userId}/roles/${role.body.role.id}`)

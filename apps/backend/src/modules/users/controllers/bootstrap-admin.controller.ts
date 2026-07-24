@@ -15,6 +15,6 @@ export class BootstrapAdminController {
   @ApiOperation({ summary: 'Provision an active administrator using the server bootstrap secret' })
   @ApiCreatedResponse({ description: 'Administrator, ADMIN role, permissions, events, and snapshot created.' })
   create(@Body() dto: BootstrapAdminDto, @Req() request: RequestWithId) {
-    return this.users.bootstrapAdmin(dto, request.requestId);
+    return this.users.bootstrapAdmin(dto, request.correlationId ?? request.requestId);
   }
 }

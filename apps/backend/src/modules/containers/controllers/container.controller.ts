@@ -16,7 +16,7 @@ export class ContainerController {
     @Body() dto: CreateContainerDto,
     @Req() req: RequestWithId,
   ) {
-    return this.containerService.createContainer(dto, req.requestId);
+    return this.containerService.createContainer(dto, req.correlationId ?? req.requestId);
   }
 
   @Post(':containerId/load-package')
@@ -28,7 +28,7 @@ export class ContainerController {
     return this.containerService.loadPackage(
       containerId,
       dto,
-      req.requestId,
+      req.correlationId ?? req.requestId,
     );
   }
 
@@ -41,7 +41,7 @@ unloadPackage(
   return this.containerService.unloadPackage(
     containerId,
     dto,
-    req.requestId,
+    req.correlationId ?? req.requestId,
   );
 }
 

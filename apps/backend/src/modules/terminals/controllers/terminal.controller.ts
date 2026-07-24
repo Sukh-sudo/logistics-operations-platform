@@ -26,7 +26,7 @@ export class TerminalController {
     @Body() dto: CreateTerminalDto,
     @Req() request: RequestWithId,
   ) {
-    return this.terminalService.createTerminal(dto, request.requestId);
+    return this.terminalService.createTerminal(dto, request.correlationId ?? request.requestId);
   }
 
   @Get()
@@ -65,7 +65,7 @@ export class TerminalController {
     @Body() dto: ReceiveTerminalAssetDto,
     @Req() request: RequestWithId,
   ) {
-    return this.terminalService.receiveAsset(id, dto, request.requestId);
+    return this.terminalService.receiveAsset(id, dto, request.correlationId ?? request.requestId);
   }
 
   @Post(':id/transfer')
@@ -74,7 +74,7 @@ export class TerminalController {
     @Body() dto: TransferTerminalAssetDto,
     @Req() request: RequestWithId,
   ) {
-    return this.terminalService.transferAsset(id, dto, request.requestId);
+    return this.terminalService.transferAsset(id, dto, request.correlationId ?? request.requestId);
   }
 
   @Patch(':id')
@@ -83,7 +83,7 @@ export class TerminalController {
     @Body() dto: UpdateTerminalDto,
     @Req() request: RequestWithId,
   ) {
-    return this.terminalService.updateTerminal(id, dto, request.requestId);
+    return this.terminalService.updateTerminal(id, dto, request.correlationId ?? request.requestId);
   }
 
   @Get(':id')

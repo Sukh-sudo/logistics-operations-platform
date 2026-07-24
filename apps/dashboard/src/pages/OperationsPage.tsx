@@ -63,7 +63,7 @@ export function OperationsPage() {
       setNotice({ kind: 'success', text: success(result) });
     } catch (error) {
       const message = typeof error === 'object' && error && 'response' in error
-        ? String((error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message ?? 'The operation was rejected.')
+        ? String((error as { response?: { data?: { message?: string | string[]; error?: { message?: string } } } }).response?.data?.error?.message ?? (error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message ?? 'The operation was rejected.')
         : error instanceof Error ? error.message : 'The operation failed.';
       setNotice({ kind: 'error', text: message });
     } finally {
