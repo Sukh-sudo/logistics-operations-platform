@@ -152,6 +152,7 @@ model Shipment {
   id                    String            @id @default(cuid())
   shipmentNumber        String            @unique
   referenceNumber       String?
+  notificationRecipient String?
   status                ShipmentStatus    @default(CREATED)
   originTerminalId      Int
   destinationTerminalId Int
@@ -162,6 +163,7 @@ model Shipment {
   packages              ShipmentPackage[]
   events                ShipmentEvent[]
   snapshot              ShipmentSnapshot?
+  notifications         Notification[]
 
   @@index([originTerminalId])
   @@index([destinationTerminalId])
@@ -196,13 +198,64 @@ model ShipmentSnapshot {
   id                String         @id @default(cuid())
   shipmentId        String         @unique
   currentStatus     ShipmentStatus @default(CREATED)
+  currentTerminalId Int?
   packageCount      Int            @default(0)
   deliveredPackages Int            @default(0)
+  outForDeliveryPackages Int       @default(0)
   remainingPackages Int            @default(0)
   progressPercent   Int            @default(0)
+  completedAt       DateTime?
   lastActivityAt    DateTime?
   updatedAt         DateTime       @updatedAt
   shipment          Shipment       @relation(fields: [shipmentId], references: [id])
+
+  @@index([currentStatus])
+  @@index([completedAt])
+}
+
+// Notifications are created from committed shipment events. The immutable
+// event stream records each notification action while this row keeps identity
+// and source-event idempotency data.
+model Notification {
+  id            String               @id @default(cuid())
+  shipmentId    String?
+  sourceEventId String               @unique
+  type          NotificationType
+  recipient     String
+  channel       NotificationChannel  @default(IN_APP)
+  payload       Json?
+  createdAt     DateTime             @default(now())
+  shipment      Shipment?            @relation(fields: [shipmentId], references: [id])
+  events        NotificationEvent[]
+  snapshot      NotificationSnapshot?
+
+  @@index([recipient, createdAt])
+  @@index([shipmentId, createdAt])
+}
+
+model NotificationEvent {
+  id             String                @id @default(cuid())
+  notificationId String
+  eventType      NotificationEventType
+  correlationId  String
+  payload        Json?
+  createdAt      DateTime              @default(now())
+  notification   Notification          @relation(fields: [notificationId], references: [id])
+
+  @@index([notificationId, createdAt])
+  @@index([correlationId])
+}
+
+model NotificationSnapshot {
+  id               String             @id @default(cuid())
+  notificationId   String             @unique
+  currentStatus    NotificationStatus @default(UNREAD)
+  deliveryAttempts Int                @default(1)
+  sentAt           DateTime?
+  readAt           DateTime?
+  lastActivityAt   DateTime?
+  updatedAt        DateTime           @updatedAt
+  notification     Notification       @relation(fields: [notificationId], references: [id])
 
   @@index([currentStatus])
 }
@@ -737,9 +790,33 @@ enum ShipmentEventType {
   SHIPMENT_UPDATED
   PACKAGE_ASSIGNED
   PACKAGE_REMOVED
+  SHIPMENT_PROGRESS_UPDATED
   SHIPMENT_IN_TRANSIT
+  SHIPMENT_OUT_FOR_DELIVERY
   SHIPMENT_COMPLETED
   SHIPMENT_CANCELLED
+}
+
+enum NotificationType {
+  SHIPMENT_CREATED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  EXCEPTION
+}
+
+enum NotificationChannel {
+  IN_APP
+}
+
+enum NotificationEventType {
+  NOTIFICATION_CREATED
+  NOTIFICATION_READ
+  NOTIFICATION_RESEND_REQUESTED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
 }
 
 enum TruckStatus {

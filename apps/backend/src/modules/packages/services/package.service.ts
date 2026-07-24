@@ -7,6 +7,7 @@ import { CreatePackageEventDto } from '../dto/create-package-event.dto';
 import { AppLogger } from '../../../common/utils/logger';
 import { PackageTransitionValidator } from '../validators/package-transition.validator';
 import { packageTypeFromIdentifier } from '../../../common/domain/asset-identifiers';
+import { ShipmentService } from '../../shipments/services/shipment.service';
 
 @Injectable()
 export class PackageService {
@@ -19,6 +20,9 @@ export class PackageService {
 
    // Operational transition validator
   private readonly transitionValidator: PackageTransitionValidator,
+
+  // Shipment projections observe committed package movement events.
+  private readonly shipmentService: ShipmentService,
 ) {}
 
   async createPackageEvent(dto: CreatePackageEventDto, requestId?: string,) {
@@ -138,6 +142,15 @@ export class PackageService {
     employeeId: dto.employeeId,
     createdAt: new Date(),
     },
+  );
+
+  // Update customer-facing shipment state only after package state commits.
+  // The shipment service owns its event and snapshot transaction.
+  await this.shipmentService.synchronizePackageProgress(
+    dto.trackingNumber,
+    dto.eventType,
+    dto.terminalId,
+    requestId,
   );
 
   return result;
