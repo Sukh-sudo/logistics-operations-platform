@@ -2,6 +2,8 @@ import type { ContainerSnapshotDto } from './container.types.js';
 import type { PackageSnapshotDto } from './package.types.js';
 import type { TrailerSnapshotDto } from './trailer.types.js';
 
+export type TerminalAssetType = 'PACKAGE' | 'CONTAINER' | 'TRAILER';
+export interface TransferTerminalAssetDto { assetType: TerminalAssetType; assetIdentifier: string; employeeId?: number; destinationTerminalId: number; }
 export interface TerminalSnapshotDto { currentStatus: string; packageCount: number; containerCount: number; trailerCount: number; truckCount: number; activeTripCount: number; employeeCount: number; lastActivityAt: string | null; }
 export interface TerminalDto { id: number; terminalCode: string; name: string; city: string; province: string; country: string; timezone: string; createdAt: string; updatedAt: string; snapshot: TerminalSnapshotDto | null; }
 export interface TerminalEventDto { id: string; terminalId: number; eventType: string; employeeId: number | null; correlationId: string; payload?: unknown; createdAt: string; }

@@ -2,6 +2,7 @@ export type TruckStatus = 'AVAILABLE' | 'ASSIGNED' | 'IN_SERVICE' | 'MAINTENANCE
 export type TruckPurpose = 'LAST_MILE' | 'MIDDLE_MILE';
 export type DriverStatus = 'AVAILABLE' | 'ASSIGNED' | 'ON_TRIP' | 'OFF_DUTY';
 export type EquipmentAssignmentStatus = 'ACTIVE' | 'RELEASED';
+export interface AssignEquipmentDto { tripId: string; truckId: string; driverId: string; trailerId: string; }
 
 export interface FleetSnapshotDto<TStatus> {
   currentStatus: TStatus;

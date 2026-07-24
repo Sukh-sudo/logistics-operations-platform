@@ -26,9 +26,16 @@ import { ContainerListPage } from '../pages/ContainerListPage';
 import { TrailerListPage } from '../pages/TrailerListPage';
 import { TrackingPage } from '../pages/TrackingPage';
 import { ReportsPage } from '../pages/ReportsPage';
+import { PublicLayout } from '../layouts/PublicLayout';
+import { OperationsPage } from '../pages/OperationsPage';
 
 export const router = createBrowserRouter([
   { element: <AuthLayout/>, children: [{ path: '/login', element: <LoginPage/> }] },
+  { element: <PublicLayout/>, children: [
+    { path: '/tracking', element: <TrackingPage/> },
+    { path: '/tracking/:shipmentNumber', element: <TrackingPage/> },
+    { path: '/health', element: <HealthPage/> },
+  ] },
   { element: <ProtectedRoute/>, children: [{ element: <AppLayout/>, children: [
     { index: true, element: <HomePage/> },
     { path: 'dashboard', element: <DashboardPage/> },
@@ -38,6 +45,7 @@ export const router = createBrowserRouter([
     { path: 'trips/:tripId', element: <TripDetailPage/> },
     { path: 'shipments/:shipmentId', element: <ShipmentDetailPage/> },
     { path: 'fleet', element: <FleetPage/> },
+    { path: 'operations', element: <OperationsPage/> },
     { path: 'fleet/trucks/:truckId', element: <TruckDetailPage/> },
     { path: 'fleet/drivers/:driverId', element: <DriverDetailPage/> },
     { path: 'search', element: <SearchPage/> },
@@ -49,11 +57,8 @@ export const router = createBrowserRouter([
     { path: 'containers/:containerBarcode', element: <ContainerDetailPage/> },
     { path: 'trailers/:trailerBarcode', element: <TrailerDetailPage/> },
     { path: 'analytics', element: <AnalyticsPage/> },
-    { path: 'tracking', element: <TrackingPage/> },
-    { path: 'tracking/:shipmentNumber', element: <TrackingPage/> },
     { path: 'reports', element: <ReportsPage/> },
     { path: 'events', element: <EventsPage/> },
-    { path: 'health', element: <HealthPage/> },
   ] }] },
   { path: '*', element: <NotFoundPage/> },
 ]);

@@ -14,7 +14,7 @@ describe('TrailerDetailPage integration', () => {
     vi.mocked(trailerApi.snapshot).mockResolvedValue({ id: 'trailer-1', trailerBarcode: barcode, currentStatus: 'OPEN', currentTerminalId: 1, containerCount: 1, packageCount: 1, updatedAt: '2026-07-12T12:00:00Z' });
     vi.mocked(trailerApi.containers).mockResolvedValue({ trailerBarcode: barcode, containerCount: 1, containers: [{ id: 'container-1', containerBarcode: 'CNT-100', packageType: 'CONVEYABLE', currentStatus: 'OPEN', currentTrailerId: 'trailer-1', currentTerminalId: 1, packageCount: 1, updatedAt: '2026-07-12T12:00:00Z' }] });
     vi.mocked(trailerApi.packages).mockResolvedValue({ trailerBarcode: barcode, packageCount: 1, packages: [{ trackingNumber: 'PKG-100', currentStatus: 'IN_TRAILER', location: 'CONTAINER', containerBarcode: 'CNT-100' }] });
-    vi.mocked(trailerApi.history).mockResolvedValue([{ id: 'event-1', trailerId: 'trailer-1', eventType: 'TRAILER_CREATED', createdAt: '2026-07-12T11:00:00Z' }]);
+    vi.mocked(trailerApi.history).mockResolvedValue([{ id: 'event-1', trailerId: 'trailer-1', eventType: 'TRAILER_CREATED', employeeId: null, correlationId: 'request-1', metadata: null, createdAt: '2026-07-12T11:00:00Z' }]);
   });
 
   it('renders snapshot, manifest links, and immutable history', async () => {

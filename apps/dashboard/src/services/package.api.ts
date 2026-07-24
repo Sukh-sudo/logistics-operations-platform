@@ -1,9 +1,11 @@
-import type { PackageEventDto, PackageLocationDto, PackageSnapshotDto } from '@logistics/shared-types';
+import type { CreatePackageEventDto, PackageEventDto, PackageLocationDto, PackageSnapshotDto } from '@logistics/shared-types';
 import { apiClient } from './apiClient';
 
 const packagePath = (trackingNumber: string) => `/package-events/${encodeURIComponent(trackingNumber)}`;
 
 export const packageApi = {
+  createEvent: async (payload: CreatePackageEventDto) => (await apiClient.post<{ snapshot: PackageSnapshotDto; event: PackageEventDto }>('/package-events', payload)).data,
+  retryProjections: async () => (await apiClient.post<{ processed: number }>('/package-events/projections/retry')).data,
   snapshot: async (trackingNumber: string) => (await apiClient.get<PackageSnapshotDto>(packagePath(trackingNumber))).data,
   location: async (trackingNumber: string) => (await apiClient.get<PackageLocationDto>(`${packagePath(trackingNumber)}/location`)).data,
   history: async (trackingNumber: string) => (await apiClient.get<PackageEventDto[]>(`${packagePath(trackingNumber)}/history`)).data,

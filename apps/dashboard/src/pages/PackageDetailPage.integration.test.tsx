@@ -13,7 +13,7 @@ describe('PackageDetailPage integration', () => {
   beforeEach(() => {
     vi.mocked(packageApi.snapshot).mockResolvedValue({ id: 'package-1', trackingNumber, packageType: 'CONVEYABLE', currentStatus: 'IN_CONTAINER', currentTerminalId: 2, currentContainerId: 'container-1', currentTrailerId: null, updatedAt: '2026-07-07T12:00:00Z' });
     vi.mocked(packageApi.location).mockResolvedValue({ trackingNumber, currentStatus: 'IN_CONTAINER', containerBarcode: 'CONTAINER-10', trailerBarcode: null });
-    vi.mocked(packageApi.history).mockResolvedValue([{ id: 'event-1', packageId: 'package-1', eventType: 'PACKAGE_RECEIVED', terminalId: 1, employeeId: 9, metadata: null, createdAt: '2026-07-06T12:00:00Z' }]);
+    vi.mocked(packageApi.history).mockResolvedValue([{ id: 'event-1', packageId: 'package-1', eventType: 'PACKAGE_RECEIVED', terminalId: 1, employeeId: 9, correlationId: 'request-1', metadata: null, createdAt: '2026-07-06T12:00:00Z' }]);
   });
 
   it('loads and combines the snapshot, resolved location, and immutable history', async () => {

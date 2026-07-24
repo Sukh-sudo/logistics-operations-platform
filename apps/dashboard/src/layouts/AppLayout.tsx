@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Boxes, Container, FileText, HeartPulse, Home, LogOut, MapPinned, PackageSearch, Route, Search, Truck } from 'lucide-react';
+import { Activity, BarChart3, Boxes, ClipboardCheck, Container, FileText, HeartPulse, Home, LogOut, MapPinned, PackageSearch, Route, Search, Truck } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -8,12 +8,13 @@ const links = [
   { to: '/containers', label: 'Containers', icon: Container }, { to: '/trailers', label: 'Trailers', icon: Truck },
   { to: '/transportation', label: 'Transportation', icon: Route },
   { to: '/fleet', label: 'Fleet', icon: Truck },
+  { to: '/operations', label: 'Operations', icon: ClipboardCheck },
   { to: '/tracking', label: 'Customer tracking', icon: MapPinned },
   { to: '/reports', label: 'Delivery reports', icon: FileText },
   { to: '/events', label: 'Recent events', icon: Activity }, { to: '/analytics', label: 'Analytics', icon: Boxes },
   { to: '/health', label: 'System health', icon: HeartPulse },
 ];
-const titles: Record<string, string> = { '/': 'Operations hub', '/dashboard': 'Operational dashboard', '/transportation': 'Transportation network', '/fleet': 'Fleet visibility', '/search': 'Global search', '/packages': 'Package visibility', '/containers': 'Container visibility', '/trailers': 'Trailer visibility', '/tracking': 'Customer tracking', '/reports': 'Delivery reports', '/events': 'Recent events', '/analytics': 'Analytics', '/health': 'System health' };
+const titles: Record<string, string> = { '/': 'Operations hub', '/dashboard': 'Operational dashboard', '/transportation': 'Transportation network', '/fleet': 'Fleet visibility', '/operations': 'Operations workspace', '/search': 'Global search', '/packages': 'Package visibility', '/containers': 'Container visibility', '/trailers': 'Trailer visibility', '/tracking': 'Customer tracking', '/reports': 'Delivery reports', '/events': 'Recent events', '/analytics': 'Analytics', '/health': 'System health' };
 
 export function AppLayout() {
   const { user, logout } = useAuth(); const navigate = useNavigate(); const location = useLocation();
