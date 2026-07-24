@@ -14,6 +14,7 @@ describe('FleetService', () => {
     driverSnapshot: { create: jest.fn(), update: jest.fn() },
     trailerSnapshot: { findUnique: jest.fn() },
     fleetUnitSequence: { upsert: jest.fn() },
+    terminalSnapshot: { update: jest.fn() },
   };
   const prisma = {
     $transaction: jest.fn((callback) => callback(tx)),
@@ -33,10 +34,15 @@ describe('FleetService', () => {
 
   it('assigns available equipment and updates both snapshots atomically', async () => {
     const createdAt = new Date();
-    tx.trip.findUnique.mockResolvedValue({ id: 'trip-1', status: 'CREATED', equipmentAssignmentId: null });
-    tx.truck.findUnique.mockResolvedValue({ id: 'truck-1', status: TruckStatus.AVAILABLE, snapshot: { assignedTripId: null } });
-    tx.driver.findUnique.mockResolvedValue({ id: 'driver-1', status: DriverStatus.AVAILABLE, snapshot: { assignedTripId: null } });
-    tx.trailerSnapshot.findUnique.mockResolvedValue({ id: 'trailer-1', currentStatus: 'OPEN' });
+    tx.trip.findUnique.mockResolvedValue({
+      id: 'trip-1',
+      status: 'CREATED',
+      equipmentAssignmentId: null,
+      route: { originTerminalId: 1 },
+    });
+    tx.truck.findUnique.mockResolvedValue({ id: 'truck-1', status: TruckStatus.AVAILABLE, snapshot: { assignedTripId: null, currentTerminalId: 1 } });
+    tx.driver.findUnique.mockResolvedValue({ id: 'driver-1', status: DriverStatus.AVAILABLE, snapshot: { assignedTripId: null, currentTerminalId: 1 } });
+    tx.trailerSnapshot.findUnique.mockResolvedValue({ id: 'trailer-1', currentStatus: 'OPEN', currentTerminalId: 1 });
     tx.equipmentAssignment.findFirst.mockResolvedValue(null);
     tx.equipmentAssignment.create.mockResolvedValue({ id: 'assignment-1', tripId: 'trip-1', truckId: 'truck-1', driverId: 'driver-1', trailerId: 'trailer-1', status: 'ACTIVE' });
     tx.fleetEvent.create.mockResolvedValueOnce({ eventType: FleetEventType.TRUCK_ASSIGNED, createdAt }).mockResolvedValueOnce({ eventType: FleetEventType.DRIVER_ASSIGNED, createdAt });
@@ -51,7 +57,12 @@ describe('FleetService', () => {
   });
 
   it('rejects assignment when a truck is unavailable', async () => {
-    tx.trip.findUnique.mockResolvedValue({ id: 'trip-1', status: 'CREATED', equipmentAssignmentId: null });
+    tx.trip.findUnique.mockResolvedValue({
+      id: 'trip-1',
+      status: 'CREATED',
+      equipmentAssignmentId: null,
+      route: { originTerminalId: 1 },
+    });
     tx.truck.findUnique.mockResolvedValue({ id: 'truck-1', status: TruckStatus.MAINTENANCE, snapshot: { assignedTripId: null } });
     tx.driver.findUnique.mockResolvedValue({ id: 'driver-1', status: DriverStatus.AVAILABLE, snapshot: { assignedTripId: null } });
     tx.trailerSnapshot.findUnique.mockResolvedValue({ id: 'trailer-1', currentStatus: 'OPEN' });
@@ -91,6 +102,7 @@ describe('FleetService', () => {
       currentStatus: TruckStatus.AVAILABLE,
       currentTerminalId: 1,
     });
+    tx.terminalSnapshot.update.mockResolvedValue({});
 
     const result = await service.createTruck({
       purpose: TruckPurpose.LAST_MILE,

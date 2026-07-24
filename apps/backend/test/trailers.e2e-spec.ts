@@ -9,21 +9,23 @@ import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
 import { PrismaClient } from '@prisma/client';
+import { createOperationalTestingModule } from './support/operational-testing-module';
+import { createTestTerminal, TestTerminalDefaultsPipe } from './support/test-terminal';
 
 const prisma = new PrismaClient();
 
 describe('Trailers (e2e)', () => {
   let app: INestApplication;
+  let terminalId: number;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule =
-      await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
+      await createOperationalTestingModule();
 
     app = moduleFixture.createNestApplication();
 
 app.useGlobalPipes(
+  new TestTerminalDefaultsPipe(() => terminalId),
   new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
@@ -36,6 +38,7 @@ app.useGlobalFilters(
 );
 
 await app.init();
+terminalId = await createTestTerminal(app, 'TRL');
   });
 
   afterAll(async () => {

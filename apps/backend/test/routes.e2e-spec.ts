@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
+import { createOperationalTestingModule } from './support/operational-testing-module';
 
 const prisma = new PrismaClient();
 
@@ -47,9 +48,8 @@ describe('Routes (e2e)', () => {
   };
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    const moduleFixture: TestingModule =
+      await createOperationalTestingModule();
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
       new ValidationPipe({

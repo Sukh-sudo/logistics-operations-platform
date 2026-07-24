@@ -10,5 +10,6 @@ import { ShipmentModule } from '../shipments/shipment.module';
   imports: [ShipmentModule],
   controllers: [PackageEventsController],
   providers: [PackageService, PackageTransitionValidator,],
+  exports: [PackageService],
 })
 export class PackageModule {}

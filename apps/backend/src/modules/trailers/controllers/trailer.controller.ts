@@ -1,10 +1,11 @@
-import {Body, Controller, Post, Param, Get,} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
 import { TrailerService } from '../services/trailer.service';
 import { CreateTrailerDto } from '../dto/create-trailer.dto';
 import { LoadContainerDto } from '../dto/load-container.dto';
 import { UnloadContainerDto } from '../dto/unload-container.dto';
 import { LoadPackageDto } from '../dto/load-package.dto';
 import { UnloadPackageDto } from '../dto/unload-package.dto';
+import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
 
 @Controller('trailers')
 export class TrailerController {
@@ -15,18 +16,21 @@ export class TrailerController {
   @Post()
   createTrailer(
     @Body() dto: CreateTrailerDto,
+    @Req() req: RequestWithId,
   ) {
-    return this.trailerService.createTrailer(dto);
+    return this.trailerService.createTrailer(dto, req.requestId);
   }
 
   @Post(':trailerId/load-container')
 loadContainer(
   @Param('trailerId') trailerId: string,
   @Body() dto: LoadContainerDto,
+  @Req() req: RequestWithId,
 ) {
   return this.trailerService.loadContainer(
     trailerId,
     dto,
+    req.requestId,
   );
 }
 
@@ -34,10 +38,12 @@ loadContainer(
 unloadContainer(
   @Param('trailerId') trailerId: string,
   @Body() dto: UnloadContainerDto,
+  @Req() req: RequestWithId,
 ) {
   return this.trailerService.unloadContainer(
     trailerId,
     dto,
+    req.requestId,
   );
 }
 
@@ -45,10 +51,12 @@ unloadContainer(
 loadPackage(
   @Param('trailerId') trailerId: string,
   @Body() dto: LoadPackageDto,
+  @Req() req: RequestWithId,
 ) {
   return this.trailerService.loadPackage(
     trailerId,
     dto,
+    req.requestId,
   );
 }
 
@@ -56,10 +64,12 @@ loadPackage(
 unloadPackage(
   @Param('trailerId') trailerId: string,
   @Body() dto: UnloadPackageDto,
+  @Req() req: RequestWithId,
 ) {
   return this.trailerService.unloadPackage(
     trailerId,
     dto,
+    req.requestId,
   );
 }
 

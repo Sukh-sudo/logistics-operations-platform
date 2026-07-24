@@ -5,21 +5,23 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { createOperationalTestingModule } from './support/operational-testing-module';
+import { createTestTerminal, TestTerminalDefaultsPipe } from './support/test-terminal';
 
 const prisma = new PrismaClient();
 
 describe('Containers (e2e)', () => {
   let app: INestApplication;
+  let terminalId: number;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule =
-      await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
+      await createOperationalTestingModule();
 
     app = moduleFixture.createNestApplication();
 
     app.useGlobalPipes(
+      new TestTerminalDefaultsPipe(() => terminalId),
       new ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
@@ -28,6 +30,7 @@ describe('Containers (e2e)', () => {
     );
 
     await app.init();
+    terminalId = await createTestTerminal(app, 'CON');
   });
 
   afterAll(async () => {
@@ -340,7 +343,7 @@ it('should create PACKAGE_LOADED_TO_CONTAINER event', async () => {
 
   // Verify event exists
   const packageRecord =
-    await prisma.packageSnapshot.findUnique({
+    await prisma.package.findUnique({
       where: { trackingNumber },
       include: { events: true },
     });
@@ -400,7 +403,7 @@ it('should create PACKAGE_UNLOADED_FROM_CONTAINER event', async () => {
 
   // Verify event exists
   const packageRecord =
-    await prisma.packageSnapshot.findUnique({
+    await prisma.package.findUnique({
       where: { trackingNumber },
       include: { events: true },
     });
@@ -424,7 +427,7 @@ it('should return packages inside container', async () => {
     .send({
       trackingNumber: packageA,
       eventType: 'PACKAGE_RECEIVED',
-      terminalId: 1,
+      terminalId,
       employeeId: 100,
     })
     .expect(201);
@@ -434,7 +437,7 @@ it('should return packages inside container', async () => {
     .send({
       trackingNumber: packageB,
       eventType: 'PACKAGE_RECEIVED',
-      terminalId: 1,
+      terminalId,
       employeeId: 100,
     })
     .expect(201);

@@ -12,6 +12,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { containerIdentifier, packageIdentifier, trailerIdentifier } from './support/asset-identifiers';
+import { createOperationalTestingModule } from './support/operational-testing-module';
 
 const prisma = new PrismaClient();
 
@@ -36,9 +37,7 @@ describe('Terminals (e2e)', () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule =
-      await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
+      await createOperationalTestingModule();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
@@ -146,26 +145,16 @@ describe('Terminals (e2e)', () => {
     const terminalId = terminal.body.terminal.id;
     const trackingNumber = packageIdentifier();
 
-    await request(app.getHttpServer())
+    const received = await request(app.getHttpServer())
       .post('/package-events')
       .send({
         trackingNumber,
         eventType: 'PACKAGE_RECEIVED',
+        terminalId,
       })
       .expect(201);
 
-    const received = await request(app.getHttpServer())
-      .post(`/terminals/${terminalId}/assets`)
-      .send({
-        assetType: TerminalAssetType.PACKAGE,
-        assetIdentifier: trackingNumber,
-      })
-      .expect(201);
-
-    expect(received.body.snapshot.packageCount).toBe(1);
-    expect(received.body.event.eventType).toBe(
-      TerminalEventType.PACKAGE_RECEIVED,
-    );
+    expect(received.body.snapshot.currentTerminalId).toBe(terminalId);
 
     const warehouse = await request(app.getHttpServer())
       .get(`/terminals/${terminalId}/warehouse`)
@@ -182,23 +171,17 @@ describe('Terminals (e2e)', () => {
     await request(app.getHttpServer()).post('/package-events').send({
       trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
-    });
+      terminalId,
+    }).expect(201);
 
     await request(app.getHttpServer())
-      .post(`/terminals/${terminalId}/assets`)
+      .post('/package-events')
       .send({
-        assetType: 'PACKAGE',
-        assetIdentifier: trackingNumber,
+        trackingNumber,
+        eventType: 'PACKAGE_RECEIVED',
+        terminalId,
       })
-      .expect(201);
-
-    await request(app.getHttpServer())
-      .post(`/terminals/${terminalId}/assets`)
-      .send({
-        assetType: 'PACKAGE',
-        assetIdentifier: trackingNumber,
-      })
-      .expect(409);
+      .expect(400);
   });
 
   it('transfers a package and updates both snapshots with correlated events', async () => {
@@ -211,14 +194,8 @@ describe('Terminals (e2e)', () => {
     await request(app.getHttpServer()).post('/package-events').send({
       trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
-    });
-    await request(app.getHttpServer())
-      .post(`/terminals/${sourceId}/assets`)
-      .send({
-        assetType: 'PACKAGE',
-        assetIdentifier: trackingNumber,
-      })
-      .expect(201);
+      terminalId: sourceId,
+    }).expect(201);
 
     const transferred = await request(app.getHttpServer())
       .post(`/terminals/${sourceId}/transfer`)
@@ -254,14 +231,15 @@ describe('Terminals (e2e)', () => {
     await request(app.getHttpServer()).post('/package-events').send({
       trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
-    });
+      terminalId: sourceId,
+    }).expect(201);
     const container = await request(app.getHttpServer())
       .post('/containers')
-      .send({ containerBarcode })
+      .send({ containerBarcode, terminalId: sourceId })
       .expect(201);
     const trailer = await request(app.getHttpServer())
       .post('/trailers')
-      .send({ trailerBarcode })
+      .send({ trailerBarcode, terminalId: sourceId })
       .expect(201);
 
     await request(app.getHttpServer())
@@ -272,14 +250,6 @@ describe('Terminals (e2e)', () => {
       .post(`/trailers/${trailer.body.snapshot.id}/load-container`)
       .send({ containerBarcode })
       .expect(201);
-    await request(app.getHttpServer())
-      .post(`/terminals/${sourceId}/assets`)
-      .send({
-        assetType: 'TRAILER',
-        assetIdentifier: trailerBarcode,
-      })
-      .expect(201);
-
     const transferred = await request(app.getHttpServer())
       .post(`/terminals/${sourceId}/transfer`)
       .send({
@@ -341,15 +311,8 @@ describe('Terminals (e2e)', () => {
     await request(app.getHttpServer()).post('/package-events').send({
       trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
-    });
-
-    await request(app.getHttpServer())
-      .post(`/terminals/${terminalId}/assets`)
-      .send({
-        assetType: 'PACKAGE',
-        assetIdentifier: trackingNumber,
-      })
-      .expect(400);
+      terminalId,
+    }).expect(400);
   });
 
   it('returns 404 for an unknown terminal', async () => {

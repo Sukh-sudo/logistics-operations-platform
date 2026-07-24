@@ -67,14 +67,28 @@ describe('DashboardService filters', () => {
     expect(prisma.packageEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: {
         createdAt: { gte: new Date('2026-07-10T00:00:00.000Z') },
-        package: { currentTerminalId: 3, currentStatus: PackageStatus.IN_TRAILER },
+        package: {
+          snapshot: {
+            currentTerminalId: 3,
+            currentStatus: PackageStatus.IN_TRAILER,
+          },
+        },
       },
     }));
     expect(prisma.containerEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ container: { currentTerminalId: 3 } }),
+      where: expect.objectContaining({
+        container: { snapshot: { currentTerminalId: 3 } },
+      }),
     }));
     expect(prisma.trailerEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ trailer: { currentTerminalId: 3, currentStatus: TrailerStatus.IN_TRANSIT } }),
+      where: expect.objectContaining({
+        trailer: {
+          snapshot: {
+            currentTerminalId: 3,
+            currentStatus: TrailerStatus.IN_TRANSIT,
+          },
+        },
+      }),
     }));
   });
 

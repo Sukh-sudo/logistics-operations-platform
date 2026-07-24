@@ -82,4 +82,8 @@ export class KafkaService implements OnModuleInit {
       );
     }
   }
+
+  isHealthy() {
+    return this.isConnected;
+  }
 }

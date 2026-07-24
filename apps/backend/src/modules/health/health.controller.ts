@@ -1,18 +1,35 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { Public } from '../auth/decorators/public.decorator';
+import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { KafkaService } from '../../infrastructure/kafka/kafka.service';
 
 @Controller('health')
 export class HealthController {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly kafka: KafkaService,
+  ) {}
 
   @Get()
-  getHealth() {
+  @Public()
+  async getHealth() {
+    let database: 'connected' | 'unavailable' = 'connected';
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+    } catch {
+      database = 'unavailable';
+    }
 
-    // Basic application health response
-    return {
-    "status": "ok",
-    "database": "connected",
-    "kafka": "unavailable",
-    "uptime": 4521,
-    "timestamp": "..."
+    const result = {
+      status: database === 'connected' ? 'ok' : 'degraded',
+      database,
+      kafka: this.kafka.isHealthy() ? 'connected' : 'unavailable',
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
     };
+    if (database === 'unavailable') {
+      throw new ServiceUnavailableException(result);
+    }
+    return result;
   }
 }

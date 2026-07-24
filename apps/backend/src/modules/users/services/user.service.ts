@@ -245,6 +245,22 @@ export class UserService {
         where: { userId },
         data: { currentTerminalId: terminalId, lastActivityAt: event.createdAt },
       });
+      if (current.currentTerminalId !== null) {
+        await tx.terminalSnapshot.update({
+          where: { terminalId: current.currentTerminalId },
+          data: {
+            employeeCount: { decrement: 1 },
+            lastActivityAt: event.createdAt,
+          },
+        });
+      }
+      await tx.terminalSnapshot.update({
+        where: { terminalId },
+        data: {
+          employeeCount: { increment: 1 },
+          lastActivityAt: event.createdAt,
+        },
+      });
       return { snapshot, terminal, event };
     });
   }

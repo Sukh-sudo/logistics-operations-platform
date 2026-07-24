@@ -5,6 +5,8 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { trailerIdentifier } from './support/asset-identifiers';
+import { containerIdentifier, packageIdentifier } from './support/asset-identifiers';
+import { createOperationalTestingModule } from './support/operational-testing-module';
 
 const prisma = new PrismaClient();
 
@@ -28,7 +30,7 @@ describe('Trips (e2e)', () => {
   };
 
   beforeAll(async () => {
-    const fixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const fixture = await createOperationalTestingModule();
     app = fixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.useGlobalFilters(new PrismaExceptionFilter());
@@ -47,9 +49,80 @@ describe('Trips (e2e)', () => {
     const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ purpose: TruckPurpose.MIDDLE_MILE, licensePlate: unique('PLT'), terminalId: originTerminalId }).expect(201)).body.truck;
     const driver = (await request(app.getHttpServer()).post('/fleet/drivers').send({ employeeId: unique('DRV'), licenseNumber: unique('LIC'), licenseClass: 'Class 1', terminalId: originTerminalId }).expect(201)).body.driver;
     // Trailer fixtures must satisfy the documented TRLR + six digits identifier format.
-    const trailer = (await request(app.getHttpServer()).post('/trailers').send({ trailerBarcode: trailerIdentifier() }).expect(201)).body.snapshot;
+    const trailer = (await request(app.getHttpServer()).post('/trailers').send({ trailerBarcode: trailerIdentifier(), terminalId: originTerminalId }).expect(201)).body.snapshot;
+    const trackingNumber = packageIdentifier();
+    await request(app.getHttpServer())
+      .post('/package-events')
+      .send({
+        trackingNumber,
+        eventType: 'PACKAGE_RECEIVED',
+        terminalId: originTerminalId,
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/package-events')
+      .send({
+        trackingNumber,
+        eventType: 'PACKAGE_SORTED',
+        terminalId: originTerminalId,
+      })
+      .expect(201);
+    const container = (await request(app.getHttpServer())
+      .post('/containers')
+      .send({
+        containerBarcode: containerIdentifier(),
+        terminalId: originTerminalId,
+      })
+      .expect(201)).body.snapshot;
+    await request(app.getHttpServer())
+      .post(`/containers/${container.id}/load-package`)
+      .send({ trackingNumber })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/trailers/${trailer.id}/load-container`)
+      .send({ containerBarcode: container.containerBarcode })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/shipments')
+      .send({
+        shipmentNumber: unique('TRIP-SHIP'),
+        originTerminalId,
+        destinationTerminalId,
+        packageTrackingNumbers: [trackingNumber],
+      })
+      .expect(201);
     await request(app.getHttpServer()).post('/fleet/assignments').send({ tripId, truckId: truck.id, driverId: driver.id, trailerId: trailer.id }).expect(201);
-    await request(app.getHttpServer()).post(`/trips/${tripId}/start`).expect(201);
+    const started = await request(app.getHttpServer()).post(`/trips/${tripId}/start`).expect(201);
+    const departedPackage = await prisma.packageSnapshot.findUniqueOrThrow({
+      where: { trackingNumber },
+    });
+    const departedContainer = await prisma.containerSnapshot.findUniqueOrThrow({
+      where: { id: container.id },
+    });
+    expect(departedPackage).toMatchObject({
+      currentStatus: 'DEPARTED',
+      currentTerminalId: null,
+    });
+    expect(departedContainer).toMatchObject({
+      currentStatus: 'IN_TRANSIT',
+      currentTerminalId: null,
+    });
+    const correlatedDepartureEvents = await Promise.all([
+      prisma.packageEvent.findFirstOrThrow({
+        where: { packageId: departedPackage.id, eventType: 'PACKAGE_DEPARTED' },
+      }),
+      prisma.containerEvent.findFirstOrThrow({
+        where: { containerId: container.id, eventType: 'CONTAINER_DEPARTED' },
+      }),
+      prisma.trailerEvent.findFirstOrThrow({
+        where: { trailerId: trailer.id, eventType: 'TRAILER_DEPARTED' },
+      }),
+    ]);
+    expect(
+      correlatedDepartureEvents.every(
+        (event) => event.correlationId === started.body.event.correlationId,
+      ),
+    ).toBe(true);
     await request(app.getHttpServer()).post(`/trips/${tripId}/stops/${created.body.stops[1].id}/arrive`).send({}).expect(409);
     for (const stop of created.body.stops) {
       await request(app.getHttpServer()).post(`/trips/${tripId}/stops/${stop.id}/arrive`).send({}).expect(201);
@@ -60,5 +133,36 @@ describe('Trips (e2e)', () => {
     expect(completed.body.fleet).toMatchObject({ truckSnapshot: { currentStatus: 'AVAILABLE', assignedTripId: null, currentTerminalId: destinationTerminalId }, driverSnapshot: { currentStatus: 'AVAILABLE', assignedTripId: null, currentTerminalId: destinationTerminalId }, trailerSnapshot: { currentStatus: 'ARRIVED', currentTerminalId: destinationTerminalId } });
     const events = await prisma.tripEvent.findMany({ where: { tripId }, orderBy: { createdAt: 'asc' } });
     expect(events.map((event) => event.eventType)).toEqual(['TRIP_CREATED', 'TRIP_STARTED', 'STOP_ARRIVED', 'STOP_DEPARTED', 'STOP_ARRIVED', 'STOP_DEPARTED', 'STOP_ARRIVED', 'STOP_DEPARTED', 'TRIP_COMPLETED']);
+
+    const destinationSnapshot =
+      await prisma.terminalSnapshot.findUniqueOrThrow({
+        where: { terminalId: destinationTerminalId },
+      });
+    expect(destinationSnapshot).toMatchObject({
+      packageCount: 1,
+      containerCount: 1,
+      trailerCount: 1,
+      truckCount: 1,
+    });
+
+    // Prove that legacy physical-asset snapshots are disposable read models.
+    await request(app.getHttpServer()).post('/snapshots/rebuild').expect(201);
+    const rebuiltPackage = await prisma.packageSnapshot.findUniqueOrThrow({
+      where: { trackingNumber },
+    });
+    const rebuiltContainer = await prisma.containerSnapshot.findUniqueOrThrow({
+      where: { id: container.id },
+    });
+    expect(rebuiltPackage).toMatchObject({
+      currentStatus: 'ARRIVED',
+      currentTerminalId: destinationTerminalId,
+      currentContainerId: container.id,
+    });
+    expect(rebuiltContainer).toMatchObject({
+      currentStatus: 'ARRIVED',
+      currentTerminalId: destinationTerminalId,
+      currentTrailerId: trailer.id,
+      packageCount: 1,
+    });
   });
 });

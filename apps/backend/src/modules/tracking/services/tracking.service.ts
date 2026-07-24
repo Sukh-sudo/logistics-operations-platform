@@ -18,7 +18,7 @@ export class TrackingService {
         destinationTerminal: true,
         snapshot: true,
         packages: {
-          include: { package: true },
+          include: { package: { include: { snapshot: true } } },
           orderBy: { package: { trackingNumber: 'asc' } },
         },
         events: { orderBy: { createdAt: 'asc' } },
@@ -53,11 +53,15 @@ export class TrackingService {
         completedAt: shipment.snapshot.completedAt,
         lastActivityAt: shipment.snapshot.lastActivityAt,
       },
-      packages: shipment.packages.map(({ package: pkg }) => ({
-        trackingNumber: pkg.trackingNumber,
-        status: pkg.currentStatus,
-        lastUpdatedAt: pkg.updatedAt,
-      })),
+      packages: shipment.packages.flatMap(({ package: pkg }) =>
+        pkg.snapshot
+          ? [{
+              trackingNumber: pkg.trackingNumber,
+              status: pkg.snapshot.currentStatus,
+              lastUpdatedAt: pkg.snapshot.updatedAt,
+            }]
+          : [],
+      ),
       milestones: shipment.events.map((event) => ({
         type: event.eventType,
         occurredAt: event.createdAt,

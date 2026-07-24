@@ -27,6 +27,11 @@ export class PackageEventsController {
     );
   }
 
+  @Post('projections/retry')
+  retryPendingProjections() {
+    return this.packageService.retryPendingProjections();
+  }
+
 
 @Get(':trackingNumber/history')
 getPackageHistory(

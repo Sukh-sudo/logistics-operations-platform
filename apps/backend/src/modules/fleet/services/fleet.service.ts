@@ -59,6 +59,13 @@ export class FleetService {
           lastActivityAt: event.createdAt,
         },
       });
+      await tx.terminalSnapshot.update({
+        where: { terminalId: dto.terminalId },
+        data: {
+          truckCount: { increment: 1 },
+          lastActivityAt: event.createdAt,
+        },
+      });
 
       return { truck, snapshot, event };
     });
@@ -167,7 +174,11 @@ export class FleetService {
         where: {
           currentStatus: { in: [TrailerStatus.OPEN, TrailerStatus.CLOSED, TrailerStatus.ARRIVED] },
           currentTerminalId: terminalId,
-          equipmentAssignments: { none: { status: EquipmentAssignmentStatus.ACTIVE } },
+          aggregate: {
+            equipmentAssignments: {
+              none: { status: EquipmentAssignmentStatus.ACTIVE },
+            },
+          },
         },
         orderBy: { trailerBarcode: 'asc' },
       }),
@@ -182,7 +193,7 @@ export class FleetService {
     const correlationId = requestId ?? randomUUID();
     return this.prisma.$transaction(async (tx) => {
       const [trip, truck, driver, trailer, trailerAssignment] = await Promise.all([
-        tx.trip.findUnique({ where: { id: dto.tripId } }),
+        tx.trip.findUnique({ where: { id: dto.tripId }, include: { route: true } }),
         tx.truck.findUnique({ where: { id: dto.truckId }, include: { snapshot: true } }),
         tx.driver.findUnique({ where: { id: dto.driverId }, include: { snapshot: true } }),
         tx.trailerSnapshot.findUnique({ where: { id: dto.trailerId } }),
@@ -197,6 +208,16 @@ export class FleetService {
       if (truck.status !== TruckStatus.AVAILABLE || truck.snapshot?.assignedTripId) throw new ConflictException('Truck is not available');
       if (driver.status !== DriverStatus.AVAILABLE || driver.snapshot?.assignedTripId) throw new ConflictException('Driver is not available');
       if (trailer.currentStatus === TrailerStatus.IN_TRANSIT || trailerAssignment) throw new ConflictException('Trailer is not available');
+      const originTerminalId = trip.route.originTerminalId;
+      if (
+        truck.snapshot?.currentTerminalId !== originTerminalId ||
+        driver.snapshot?.currentTerminalId !== originTerminalId ||
+        trailer.currentTerminalId !== originTerminalId
+      ) {
+        throw new ConflictException(
+          'Truck, driver, and trailer must all be present at the trip origin terminal',
+        );
+      }
 
       // The assignment row preserves allocation history; snapshots serve current-state reads.
       const assignment = await tx.equipmentAssignment.create({

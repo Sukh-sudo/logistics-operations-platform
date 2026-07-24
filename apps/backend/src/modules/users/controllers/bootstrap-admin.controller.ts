@@ -3,6 +3,7 @@ import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
 import { BootstrapAdminDto } from '../dto/bootstrap-admin.dto';
 import { UserService } from '../services/user.service';
+import { Public } from '../../auth/decorators/public.decorator';
 
 @ApiTags('Bootstrap')
 @Controller('bootstrap')
@@ -10,6 +11,7 @@ export class BootstrapAdminController {
   constructor(private readonly users: UserService) {}
 
   @Post('admin')
+  @Public()
   @ApiOperation({ summary: 'Provision an active administrator using the server bootstrap secret' })
   @ApiCreatedResponse({ description: 'Administrator, ADMIN role, permissions, events, and snapshot created.' })
   create(@Body() dto: BootstrapAdminDto, @Req() request: RequestWithId) {

@@ -4,6 +4,7 @@ import { LoginDto } from '../dto/login.dto';
 import { LogoutDto, RefreshTokenDto } from '../dto/refresh-token.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
+import { Public } from '../decorators/public.decorator';
 import { AuthService } from '../services/auth.service';
 
 @Controller('auth')
@@ -11,11 +12,13 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @Public()
   login(@Body() dto: LoginDto, @Req() request: AuthenticatedRequest) {
     return this.authService.login(dto, request.requestId);
   }
 
   @Post('refresh')
+  @Public()
   refresh(@Body() dto: RefreshTokenDto, @Req() request: AuthenticatedRequest) {
     return this.authService.refresh(dto.refreshToken, request.requestId);
   }

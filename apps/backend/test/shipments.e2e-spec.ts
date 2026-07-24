@@ -5,6 +5,7 @@ import request from 'supertest';
 import { packageIdentifier } from './support/asset-identifiers';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
+import { createOperationalTestingModule } from './support/operational-testing-module';
 
 const prisma = new PrismaClient();
 
@@ -13,16 +14,16 @@ describe('Shipments (e2e)', () => {
   let sequence = 0;
   const unique = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${sequence++}`;
   const terminal = async () => (await request(app.getHttpServer()).post('/terminals').send({ terminalCode: unique('ST'), city: 'Edmonton', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton' }).expect(201)).body.terminal.id as number;
-  const pkg = async () => { const trackingNumber = packageIdentifier(); await request(app.getHttpServer()).post('/package-events').send({ trackingNumber, eventType: 'PACKAGE_RECEIVED' }).expect(201); return trackingNumber; };
+  const pkg = async (terminalId: number) => { const trackingNumber = packageIdentifier(); await request(app.getHttpServer()).post('/package-events').send({ trackingNumber, eventType: 'PACKAGE_RECEIVED', terminalId }).expect(201); return trackingNumber; };
 
   beforeAll(async () => {
-    const fixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const fixture = await createOperationalTestingModule();
     app = fixture.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })); app.useGlobalFilters(new PrismaExceptionFilter()); await app.init();
   });
   afterAll(async () => { await app.close(); await prisma.$disconnect(); });
 
   it('manages package membership and completes only after delivery', async () => {
-    const originTerminalId = await terminal(); const destinationTerminalId = await terminal(); const first = await pkg(); const second = await pkg();
+    const originTerminalId = await terminal(); const destinationTerminalId = await terminal(); const first = await pkg(originTerminalId); const second = await pkg(originTerminalId);
     const created = await request(app.getHttpServer()).post('/shipments').send({ shipmentNumber: unique('SHIP'), referenceNumber: 'ORDER-1', originTerminalId, destinationTerminalId, packageTrackingNumbers: [first] }).expect(201);
     const id = created.body.shipment.id;
     expect(created.body.event.eventType).toBe('SHIPMENT_CREATED'); expect(created.body.snapshot.packageCount).toBe(1);

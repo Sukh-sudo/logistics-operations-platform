@@ -5,16 +5,17 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { createOperationalTestingModule } from './support/operational-testing-module';
+import { createTestTerminal } from './support/test-terminal';
 
 describe('Package Events (e2e)', () => {
   let app: INestApplication;
+  let terminalId: number;
 
   beforeAll(async () => {
     // Create Nest testing module
     const moduleFixture: TestingModule =
-      await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
+      await createOperationalTestingModule();
 
     // Create Nest application instance
     app = moduleFixture.createNestApplication();
@@ -29,6 +30,7 @@ describe('Package Events (e2e)', () => {
     );
 
     await app.init();
+    terminalId = await createTestTerminal(app, 'PKG');
   });
 
   afterAll(async () => {
@@ -43,7 +45,7 @@ describe('Package Events (e2e)', () => {
     const payload = {
       trackingNumber: packageIdentifier(),
       eventType: 'PACKAGE_RECEIVED',
-      terminalId: 1,
+      terminalId,
       employeeId: 55,
     };
 
@@ -95,6 +97,7 @@ describe('Package Events (e2e)', () => {
     .send({
       trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
+      terminalId,
     });
 
   await request(app.getHttpServer())
@@ -144,6 +147,7 @@ describe('Package Events (e2e)', () => {
     .send({
       trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
+      terminalId,
     });
 
   await request(app.getHttpServer())
@@ -181,7 +185,7 @@ describe('Package Events (e2e)', () => {
     .send({
       trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
-      terminalId: 1,
+      terminalId,
       employeeId: 101,
     })
     .expect(201);
@@ -196,7 +200,7 @@ describe('Package Events (e2e)', () => {
     .send({
       trackingNumber,
       eventType: 'PACKAGE_SORTED',
-      terminalId: 1,
+      terminalId,
       employeeId: 101,
     })
     .expect(201);
@@ -211,7 +215,7 @@ describe('Package Events (e2e)', () => {
     .send({
       trackingNumber,
       eventType: 'PACKAGE_LOADED_TO_CONTAINER',
-      terminalId: 1,
+      terminalId,
       employeeId: 101,
     })
     .expect(201);
@@ -226,7 +230,7 @@ describe('Package Events (e2e)', () => {
     .send({
       trackingNumber,
       eventType: 'PACKAGE_LOADED_TO_TRAILER',
-      terminalId: 1,
+      terminalId,
       employeeId: 101,
     })
     .expect(201);
@@ -241,7 +245,7 @@ describe('Package Events (e2e)', () => {
     .send({
       trackingNumber,
       eventType: 'PACKAGE_DEPARTED',
-      terminalId: 1,
+      terminalId,
       employeeId: 101,
     })
     .expect(201);
@@ -306,6 +310,7 @@ it('should reject DELIVERED back to IN_TRAILER transition', async () => {
     .send({
       trackingNumber,
       eventType: 'PACKAGE_RECEIVED',
+      terminalId,
     });
 
   await request(app.getHttpServer())

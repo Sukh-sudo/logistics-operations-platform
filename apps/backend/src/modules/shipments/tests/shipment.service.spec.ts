@@ -6,13 +6,18 @@ describe('ShipmentService', () => {
   const tx = {
     terminal: { findMany: jest.fn() }, shipment: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     packageSnapshot: { findMany: jest.fn() }, shipmentPackage: { findMany: jest.fn(), createMany: jest.fn() },
-    shipmentEvent: { create: jest.fn() }, shipmentSnapshot: { create: jest.fn(), update: jest.fn() },
+    shipmentEvent: { create: jest.fn(), findUnique: jest.fn() }, shipmentSnapshot: { create: jest.fn(), update: jest.fn() },
   };
   const prisma = { $transaction: jest.fn((callback) => callback(tx)), shipment: { findMany: jest.fn(), findUnique: jest.fn() } };
   const notifications = { createFromShipmentEvent: jest.fn() };
   let service: ShipmentService;
 
-  beforeEach(() => { jest.clearAllMocks(); notifications.createFromShipmentEvent.mockResolvedValue(null); service = new ShipmentService(prisma as never, notifications as never); });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    tx.shipmentEvent.findUnique.mockResolvedValue(null);
+    notifications.createFromShipmentEvent.mockResolvedValue(null);
+    service = new ShipmentService(prisma as never, notifications as never);
+  });
 
   it('creates package membership, an event, and snapshot in one transaction', async () => {
     const createdAt = new Date();
@@ -53,7 +58,9 @@ describe('ShipmentService', () => {
         packages: [
           {
             package: {
-              currentStatus: PackageStatus.DELIVERED,
+              snapshot: {
+                currentStatus: PackageStatus.DELIVERED,
+              },
             },
           },
         ],
@@ -82,11 +89,13 @@ describe('ShipmentService', () => {
       PackageEventType.PACKAGE_DELIVERED,
       2,
       'request-1',
+      'package-event-1',
     );
 
     expect(tx.shipmentEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         eventType: ShipmentEventType.SHIPMENT_COMPLETED,
+        sourcePackageEventId: 'package-event-1',
       }),
     });
     expect(tx.shipmentSnapshot.update).toHaveBeenCalledWith({

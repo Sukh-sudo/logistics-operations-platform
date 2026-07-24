@@ -6,6 +6,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { packageIdentifier } from './support/asset-identifiers';
+import { createOperationalTestingModule } from './support/operational-testing-module';
 
 const prisma = new PrismaClient();
 
@@ -29,9 +30,7 @@ describe('Phase 4 customer features (e2e)', () => {
     ).body.terminal.id as number;
 
   beforeAll(async () => {
-    const fixture = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    const fixture = await createOperationalTestingModule();
     app = fixture.createNestApplication();
     app.useGlobalPipes(
       new ValidationPipe({

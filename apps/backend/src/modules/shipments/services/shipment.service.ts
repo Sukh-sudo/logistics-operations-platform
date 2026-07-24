@@ -42,13 +42,14 @@ export class ShipmentService {
   }
 
   getShipments() {
-    return this.prisma.shipment.findMany({ include: { snapshot: true, packages: { include: { package: true } } }, orderBy: { shipmentNumber: 'asc' } });
+    return this.prisma.shipment.findMany({ include: { snapshot: true, packages: { include: { package: { include: { snapshot: true } } } } }, orderBy: { shipmentNumber: 'asc' } })
+      .then((shipments) => shipments.map((shipment) => this.withPackageSnapshots(shipment)));
   }
 
   async getShipment(id: string) {
-    const shipment = await this.prisma.shipment.findUnique({ where: { id }, include: { originTerminal: true, destinationTerminal: true, snapshot: true, packages: { include: { package: true } } } });
+    const shipment = await this.prisma.shipment.findUnique({ where: { id }, include: { originTerminal: true, destinationTerminal: true, snapshot: true, packages: { include: { package: { include: { snapshot: true } } } } } });
     if (!shipment) throw new NotFoundException('Shipment not found');
-    return shipment;
+    return this.withPackageSnapshots(shipment);
   }
 
   async updateShipment(id: string, dto: UpdateShipmentDto, requestId?: string) {
@@ -95,7 +96,7 @@ export class ShipmentService {
     const result = await this.prisma.$transaction(async (tx) => {
       const current = await this.shipmentForMutation(tx, id);
       this.ensureMutable(current.status);
-      if (!current.packages.length || current.packages.some((item) => item.package.currentStatus !== PackageStatus.DELIVERED)) {
+      if (!current.packages.length || current.packages.some((item) => item.package.snapshot?.currentStatus !== PackageStatus.DELIVERED)) {
         throw new ConflictException('Every package must be delivered before completion');
       }
       const shipment = await tx.shipment.update({ where: { id }, data: { status: ShipmentStatus.COMPLETED } });
@@ -130,8 +131,17 @@ export class ShipmentService {
     packageEventType: PackageEventType,
     terminalId?: number,
     requestId?: string,
+    sourcePackageEventId?: string,
   ) {
     const result = await this.prisma.$transaction(async (tx) => {
+      if (
+        sourcePackageEventId &&
+        (await tx.shipmentEvent.findUnique({
+          where: { sourcePackageEventId },
+        }))
+      ) {
+        return null;
+      }
       const pkg = await tx.packageSnapshot.findUnique({
         where: { trackingNumber },
       });
@@ -144,7 +154,7 @@ export class ShipmentService {
           shipment: {
             include: {
               snapshot: true,
-              packages: { include: { package: true } },
+              packages: { include: { package: { include: { snapshot: true } } } },
             },
           },
         },
@@ -163,10 +173,10 @@ export class ShipmentService {
       }
 
       const progress = this.progress(
-        current.packages.map((item) => item.package),
+        current.packages.flatMap((item) => item.package.snapshot ? [item.package.snapshot] : []),
       );
       const nextStatus = this.derivedStatus(
-        current.packages.map((item) => item.package),
+        current.packages.flatMap((item) => item.package.snapshot ? [item.package.snapshot] : []),
         progress,
       );
       const eventType = this.progressEventType(
@@ -177,6 +187,7 @@ export class ShipmentService {
       const event = await tx.shipmentEvent.create({
         data: {
           shipmentId: current.id,
+          sourcePackageEventId,
           eventType,
           correlationId: requestId ?? randomUUID(),
           payload: {
@@ -225,7 +236,7 @@ export class ShipmentService {
   }
 
   private async shipmentForMutation(tx: Tx, id: string) {
-    const shipment = await tx.shipment.findUnique({ where: { id }, include: { packages: { include: { package: true } }, snapshot: true } });
+    const shipment = await tx.shipment.findUnique({ where: { id }, include: { packages: { include: { package: { include: { snapshot: true } } } }, snapshot: true } });
     if (!shipment) throw new NotFoundException('Shipment not found');
     return shipment;
   }
@@ -242,8 +253,8 @@ export class ShipmentService {
   }
 
   private async refreshSnapshot(tx: Tx, shipmentId: string, lastActivityAt: Date) {
-    const memberships = await tx.shipmentPackage.findMany({ where: { shipmentId }, include: { package: true } });
-    const progress = this.progress(memberships.map((item) => item.package));
+    const memberships = await tx.shipmentPackage.findMany({ where: { shipmentId }, include: { package: { include: { snapshot: true } } } });
+    const progress = this.progress(memberships.flatMap((item) => item.package.snapshot ? [item.package.snapshot] : []));
     const status = progress.deliveredPackages > 0 ? ShipmentStatus.PARTIALLY_DELIVERED : ShipmentStatus.PACKAGES_ASSIGNED;
     await tx.shipment.update({ where: { id: shipmentId }, data: { status } });
     return tx.shipmentSnapshot.update({ where: { shipmentId }, data: { currentStatus: status, ...progress, lastActivityAt } });
@@ -253,6 +264,25 @@ export class ShipmentService {
     const deliveredPackages = packages.filter((item) => item.currentStatus === PackageStatus.DELIVERED).length;
     const outForDeliveryPackages = packages.filter((item) => item.currentStatus === PackageStatus.OUT_FOR_DELIVERY).length;
     return { packageCount: packages.length, deliveredPackages, outForDeliveryPackages, remainingPackages: packages.length - deliveredPackages, progressPercent: packages.length ? Math.floor(deliveredPackages * 100 / packages.length) : 0 };
+  }
+
+  /**
+   * Preserve the existing API shape while persistence points membership at
+   * stable aggregate identity rather than the disposable snapshot row.
+   */
+  private withPackageSnapshots<T extends {
+    packages: Array<{
+      package: { snapshot: unknown };
+      [key: string]: unknown;
+    }>;
+  }>(shipment: T) {
+    return {
+      ...shipment,
+      packages: shipment.packages.map(({ package: aggregate, ...membership }) => ({
+        ...membership,
+        package: aggregate.snapshot,
+      })),
+    };
   }
 
   private derivedStatus(

@@ -62,6 +62,11 @@ describe('Authentication and authorization (e2e)', () => {
     await prisma.$disconnect();
   });
 
+  it('protects operational APIs while preserving explicit public endpoints', async () => {
+    await request(app.getHttpServer()).get('/terminals').expect(401);
+    await request(app.getHttpServer()).get('/health').expect(200);
+  });
+
   it('rotates sessions, enforces snapshot permissions, and revokes credentials', async () => {
     const permission = await request(app.getHttpServer())
       .post('/permissions')

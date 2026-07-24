@@ -1,16 +1,38 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DriverStatus, EquipmentAssignmentStatus, FleetEventType, Prisma, RouteStatus, TrailerEventType, TrailerStatus, TripEventType, TripStatus, TripStopStatus, TruckStatus } from '@prisma/client';
+import {
+  ContainerEventType,
+  ContainerStatus,
+  DriverStatus,
+  EquipmentAssignmentStatus,
+  FleetEventType,
+  PackageEventType,
+  PackageStatus,
+  Prisma,
+  RouteStatus,
+  TerminalEventType,
+  type TerminalEvent,
+  TrailerEventType,
+  TrailerStatus,
+  TripEventType,
+  TripStatus,
+  TripStopStatus,
+  TruckStatus,
+} from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CreateTripDto } from '../dto/create-trip.dto';
 import { TripStopActionDto } from '../dto/trip-stop-action.dto';
 import { UpdateTripDto } from '../dto/update-trip.dto';
+import { PackageService } from '../../packages/services/package.service';
 
 type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class TripService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly packages: PackageService,
+  ) {}
 
   async createTrip(dto: CreateTripDto, requestId?: string) {
     const correlationId = requestId ?? randomUUID();
@@ -102,8 +124,8 @@ export class TripService {
     });
   }
 
-  startTrip(id: string, requestId?: string) {
-    return this.prisma.$transaction(async (tx) => {
+  async startTrip(id: string, requestId?: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
       const current = await this.tripForMutation(tx, id);
       this.requireStatus(current.status, TripStatus.CREATED, 'Trip cannot be started');
       const assignment = await this.requireActiveEquipment(tx, id, current.equipmentAssignmentId);
@@ -112,9 +134,16 @@ export class TripService {
       const trip = await tx.trip.update({ where: { id }, data: { status: TripStatus.IN_PROGRESS, actualDeparture: now } });
       const event = await tx.tripEvent.create({ data: { tripId: id, eventType: TripEventType.TRIP_STARTED, correlationId } });
       const snapshot = await tx.tripSnapshot.update({ where: { tripId: id }, data: { currentStatus: TripStatus.IN_PROGRESS, lastActivityAt: event.createdAt } });
-      const fleet = await this.startFleetResources(tx, assignment, correlationId);
+      const fleet = await this.startFleetResources(
+        tx,
+        assignment,
+        correlationId,
+        current.route.originTerminalId,
+      );
       return { trip, event, snapshot, fleet };
     });
+    await this.processPackageProjections(result.fleet.packageEventIds);
+    return result;
   }
 
   arriveStop(id: string, stopId: string, dto: TripStopActionDto, requestId?: string) {
@@ -126,7 +155,7 @@ export class TripService {
   }
 
   async completeTrip(id: string, requestId?: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const current = await this.tripForMutation(tx, id);
       this.requireStatus(current.status, TripStatus.IN_PROGRESS, 'Trip is not in progress');
       if (current.stops.some((stop) => stop.status !== TripStopStatus.DEPARTED)) {
@@ -138,9 +167,18 @@ export class TripService {
       const event = await tx.tripEvent.create({ data: { tripId: id, eventType: TripEventType.TRIP_COMPLETED, correlationId } });
       const snapshot = await tx.tripSnapshot.update({ where: { tripId: id }, data: { currentStatus: TripStatus.COMPLETED, currentStopId: null, nextStopId: null, progressPercent: 100, lastActivityAt: event.createdAt } });
       const destinationTerminalId = current.stops.at(-1)?.terminalId;
-      const fleet = await this.releaseFleetResources(tx, assignment, correlationId, true, destinationTerminalId);
+      const fleet = await this.releaseFleetResources(
+        tx,
+        assignment,
+        correlationId,
+        true,
+        destinationTerminalId,
+        current.route.originTerminalId,
+      );
       return { trip, event, snapshot, fleet };
     });
+    await this.processPackageProjections(result.fleet.packageEventIds);
+    return result;
   }
 
   async cancelTrip(id: string, requestId?: string) {
@@ -155,7 +193,14 @@ export class TripService {
       const event = await tx.tripEvent.create({ data: { tripId: id, eventType: TripEventType.TRIP_CANCELLED, correlationId } });
       const snapshot = await tx.tripSnapshot.update({ where: { tripId: id }, data: { currentStatus: TripStatus.CANCELLED, lastActivityAt: event.createdAt } });
       const fleet = assignment
-        ? await this.releaseFleetResources(tx, assignment, correlationId, current.status === TripStatus.IN_PROGRESS, current.snapshot?.currentTerminalId ?? undefined)
+        ? await this.releaseFleetResources(
+            tx,
+            assignment,
+            correlationId,
+            current.status === TripStatus.IN_PROGRESS,
+            current.snapshot?.currentTerminalId ?? undefined,
+            current.route.originTerminalId,
+          )
         : null;
       return { trip, event, snapshot, fleet };
     });
@@ -174,17 +219,28 @@ export class TripService {
       const now = new Date();
       const delayMinutes = Math.max(0, Math.round((now.getTime() - (arriving ? stop.plannedArrival : stop.plannedDeparture).getTime()) / 60000));
       const updated = await tx.tripStop.update({ where: { id: stopId }, data: arriving ? { status: TripStopStatus.ARRIVED, actualArrival: now, delayMinutes, notes: dto.notes } : { status: TripStopStatus.DEPARTED, actualDeparture: now, delayMinutes, notes: dto.notes } });
-      const event = await tx.tripEvent.create({ data: { tripId: id, eventType: arriving ? TripEventType.STOP_ARRIVED : TripEventType.STOP_DEPARTED, correlationId: requestId ?? randomUUID(), payload: { stopId, terminalId: stop.terminalId, sequence: stop.sequence, delayMinutes } } });
+      const correlationId = requestId ?? randomUUID();
+      const event = await tx.tripEvent.create({ data: { tripId: id, eventType: arriving ? TripEventType.STOP_ARRIVED : TripEventType.STOP_DEPARTED, correlationId, payload: { stopId, terminalId: stop.terminalId, sequence: stop.sequence, delayMinutes } } });
+      const delayEvent = delayMinutes > 0
+        ? await tx.tripEvent.create({
+            data: {
+              tripId: id,
+              eventType: TripEventType.STOP_DELAYED,
+              correlationId,
+              payload: { stopId, terminalId: stop.terminalId, sequence: stop.sequence, delayMinutes },
+            },
+          })
+        : null;
       const stops = trip.stops.map((item) => item.id === stopId ? updated : item);
       const completed = stops.filter((item) => item.status === TripStopStatus.DEPARTED).length;
       const next = stops.find((item) => item.status !== TripStopStatus.DEPARTED);
-      const snapshot = await tx.tripSnapshot.update({ where: { tripId: id }, data: { currentStopId: arriving ? stopId : null, nextStopId: arriving ? stopId : next?.id ?? null, currentTerminalId: arriving ? stop.terminalId : null, completedStops: completed, progressPercent: Math.floor(completed * 100 / stops.length), delayMinutes: Math.max(...stops.map((item) => item.delayMinutes)), lastActivityAt: event.createdAt } });
-      return { stop: updated, event, snapshot };
+      const snapshot = await tx.tripSnapshot.update({ where: { tripId: id }, data: { currentStopId: arriving ? stopId : null, nextStopId: arriving ? stopId : next?.id ?? null, currentTerminalId: arriving ? stop.terminalId : null, completedStops: completed, progressPercent: Math.floor(completed * 100 / stops.length), delayMinutes: Math.max(...stops.map((item) => item.delayMinutes)), lastActivityAt: delayEvent?.createdAt ?? event.createdAt } });
+      return { stop: updated, event, delayEvent, snapshot };
     });
   }
 
   private async tripForMutation(tx: Tx, id: string) {
-    const trip = await tx.trip.findUnique({ where: { id }, include: { stops: { orderBy: { sequence: 'asc' } }, snapshot: true } });
+    const trip = await tx.trip.findUnique({ where: { id }, include: { route: true, stops: { orderBy: { sequence: 'asc' } }, snapshot: true } });
     if (!trip) throw new NotFoundException('Trip not found');
     return trip;
   }
@@ -202,17 +258,67 @@ export class TripService {
     tx: Tx,
     assignment: { id: string; tripId: string; truckId: string; driverId: string; trailerId: string | null },
     correlationId: string,
+    originTerminalId: number,
   ) {
+    const [truck, driver, trailer] = await Promise.all([
+      tx.truckSnapshot.findUnique({ where: { truckId: assignment.truckId } }),
+      tx.driverSnapshot.findUnique({ where: { driverId: assignment.driverId } }),
+      tx.trailerSnapshot.findUnique({ where: { id: assignment.trailerId! } }),
+    ]);
+    if (
+      truck?.currentTerminalId !== originTerminalId ||
+      driver?.currentTerminalId !== originTerminalId ||
+      trailer?.currentTerminalId !== originTerminalId
+    ) {
+      throw new ConflictException(
+        'Assigned equipment is not present at the trip origin terminal',
+      );
+    }
+
     // Trip execution and fleet read models change in the same database transaction.
-    await tx.truck.update({ where: { id: assignment.truckId }, data: { status: TruckStatus.IN_SERVICE } });
-    await tx.driver.update({ where: { id: assignment.driverId }, data: { status: DriverStatus.ON_TRIP } });
-    const trailerSnapshot = await tx.trailerSnapshot.update({ where: { id: assignment.trailerId! }, data: { currentStatus: TrailerStatus.IN_TRANSIT } });
+    await tx.truck.update({ where: { id: assignment.truckId }, data: { status: TruckStatus.IN_SERVICE, terminalId: null } });
+    await tx.driver.update({ where: { id: assignment.driverId }, data: { status: DriverStatus.ON_TRIP, terminalId: null } });
+    const trailerSnapshot = await tx.trailerSnapshot.update({ where: { id: assignment.trailerId! }, data: { currentStatus: TrailerStatus.IN_TRANSIT, currentTerminalId: null } });
     const truckEvent = await tx.fleetEvent.create({ data: { truckId: assignment.truckId, eventType: FleetEventType.TRUCK_IN_SERVICE, correlationId, payload: { tripId: assignment.tripId, assignmentId: assignment.id } } });
     const driverEvent = await tx.fleetEvent.create({ data: { driverId: assignment.driverId, eventType: FleetEventType.DRIVER_ON_TRIP, correlationId, payload: { tripId: assignment.tripId, assignmentId: assignment.id } } });
-    const trailerEvent = await tx.trailerEvent.create({ data: { trailerId: assignment.trailerId!, eventType: TrailerEventType.TRAILER_DEPARTED } });
-    const truckSnapshot = await tx.truckSnapshot.update({ where: { truckId: assignment.truckId }, data: { currentStatus: TruckStatus.IN_SERVICE, lastActivityAt: truckEvent.createdAt } });
-    const driverSnapshot = await tx.driverSnapshot.update({ where: { driverId: assignment.driverId }, data: { currentStatus: DriverStatus.ON_TRIP, lastActivityAt: driverEvent.createdAt } });
-    return { events: [truckEvent, driverEvent], trailerEvent, truckSnapshot, driverSnapshot, trailerSnapshot };
+    const trailerEvent = await tx.trailerEvent.create({ data: { trailerId: assignment.trailerId!, eventType: TrailerEventType.TRAILER_DEPARTED, correlationId, metadata: { tripId: assignment.tripId, terminalId: null, departedTerminalId: originTerminalId } } });
+    const truckSnapshot = await tx.truckSnapshot.update({ where: { truckId: assignment.truckId }, data: { currentStatus: TruckStatus.IN_SERVICE, currentTerminalId: null, lastActivityAt: truckEvent.createdAt } });
+    const driverSnapshot = await tx.driverSnapshot.update({ where: { driverId: assignment.driverId }, data: { currentStatus: DriverStatus.ON_TRIP, currentTerminalId: null, lastActivityAt: driverEvent.createdAt } });
+    const terminalEvent = await tx.terminalEvent.create({
+      data: {
+        terminalId: originTerminalId,
+        eventType: TerminalEventType.TRIP_DEPARTED,
+        correlationId,
+        payload: { tripId: assignment.tripId, trailerId: assignment.trailerId },
+      },
+    });
+    const freight = await this.departFreight(
+      tx,
+      assignment.trailerId!,
+      originTerminalId,
+      assignment.tripId,
+      correlationId,
+    );
+    await tx.terminalSnapshot.update({
+      where: { terminalId: originTerminalId },
+      data: {
+        packageCount: { decrement: freight.packageCount },
+        containerCount: { decrement: freight.containerCount },
+        trailerCount: { decrement: 1 },
+        truckCount: { decrement: 1 },
+        activeTripCount: { increment: 1 },
+        lastActivityAt: terminalEvent.createdAt,
+      },
+    });
+    return {
+      events: [truckEvent, driverEvent],
+      trailerEvent,
+      terminalEvent,
+      packageEventIds: freight.packageEventIds,
+      truckSnapshot,
+      driverSnapshot,
+      trailerSnapshot,
+    };
   }
 
   private async releaseFleetResources(
@@ -221,6 +327,7 @@ export class TripService {
     correlationId: string,
     completeTrailerJourney: boolean,
     terminalId?: number,
+    originTerminalId?: number,
   ) {
     // The assignment row remains immutable history apart from its release marker.
     const releasedAt = new Date();
@@ -235,9 +342,185 @@ export class TripService {
       ? await tx.trailerSnapshot.update({ where: { id: assignment.trailerId! }, data: { currentStatus: TrailerStatus.ARRIVED, ...(terminalId ? { currentTerminalId: terminalId } : {}) } })
       : null;
     const trailerEvent = completeTrailerJourney
-      ? await tx.trailerEvent.create({ data: { trailerId: assignment.trailerId!, eventType: TrailerEventType.TRAILER_ARRIVED } })
+      ? await tx.trailerEvent.create({ data: { trailerId: assignment.trailerId!, eventType: TrailerEventType.TRAILER_ARRIVED, correlationId, metadata: { tripId: assignment.tripId, terminalId: terminalId ?? null } } })
       : null;
-    return { events: [truckEvent, driverEvent], trailerEvent, truckSnapshot, driverSnapshot, trailerSnapshot };
+    let terminalEvent: TerminalEvent | null = null;
+    let packageEventIds: string[] = [];
+    if (completeTrailerJourney && terminalId) {
+      terminalEvent = await tx.terminalEvent.create({
+        data: {
+          terminalId,
+          eventType: TerminalEventType.TRIP_ARRIVED,
+          correlationId,
+          payload: { tripId: assignment.tripId, trailerId: assignment.trailerId },
+        },
+      });
+      const freight = await this.arriveFreight(
+        tx,
+        assignment.trailerId!,
+        terminalId,
+        assignment.tripId,
+        correlationId,
+      );
+      packageEventIds = freight.packageEventIds;
+      await tx.terminalSnapshot.update({
+        where: { terminalId },
+        data: {
+          packageCount: { increment: freight.packageCount },
+          containerCount: { increment: freight.containerCount },
+          trailerCount: { increment: 1 },
+          truckCount: { increment: 1 },
+          lastActivityAt: terminalEvent.createdAt,
+        },
+      });
+    }
+    // A cancelled in-transit trip may not have an arrival terminal, but it is
+    // no longer active at its origin and the operational count must still close.
+    if (completeTrailerJourney && originTerminalId) {
+      await tx.terminalSnapshot.update({
+        where: { terminalId: originTerminalId },
+        data: { activeTripCount: { decrement: 1 } },
+      });
+    }
+    return { events: [truckEvent, driverEvent], trailerEvent, terminalEvent, packageEventIds, truckSnapshot, driverSnapshot, trailerSnapshot };
+  }
+
+  private async departFreight(
+    tx: Tx,
+    trailerId: string,
+    terminalId: number,
+    tripId: string,
+    correlationId: string,
+  ) {
+    const containers = await tx.containerSnapshot.findMany({
+      where: { currentTrailerId: trailerId },
+    });
+    const containerIds = containers.map((container) => container.id);
+    const packages = await tx.packageSnapshot.findMany({
+      where: {
+        OR: [
+          { currentTrailerId: trailerId },
+          ...(containerIds.length
+            ? [{ currentContainerId: { in: containerIds } }]
+            : []),
+        ],
+      },
+    });
+    for (const container of containers) {
+      await tx.containerEvent.create({
+        data: {
+          containerId: container.id,
+          eventType: ContainerEventType.CONTAINER_DEPARTED,
+          correlationId,
+          metadata: { tripId, trailerId, departedTerminalId: terminalId, terminalId: null },
+        },
+      });
+    }
+    if (containerIds.length) {
+      await tx.containerSnapshot.updateMany({
+        where: { id: { in: containerIds } },
+        data: { currentStatus: ContainerStatus.IN_TRANSIT, currentTerminalId: null },
+      });
+    }
+    const packageEventIds: string[] = [];
+    for (const pkg of packages) {
+      const event = await tx.packageEvent.create({
+        data: {
+          packageId: pkg.id,
+          eventType: PackageEventType.PACKAGE_DEPARTED,
+          terminalId,
+          correlationId,
+          metadata: { tripId, trailerId, currentTerminalId: null },
+        },
+      });
+      await tx.packageProjectionOutbox.create({
+        data: { packageEventId: event.id },
+      });
+      packageEventIds.push(event.id);
+    }
+    if (packages.length) {
+      await tx.packageSnapshot.updateMany({
+        where: { id: { in: packages.map((pkg) => pkg.id) } },
+        data: { currentStatus: PackageStatus.DEPARTED, currentTerminalId: null },
+      });
+    }
+    return {
+      packageEventIds,
+      packageCount: packages.length,
+      containerCount: containers.length,
+    };
+  }
+
+  private async arriveFreight(
+    tx: Tx,
+    trailerId: string,
+    terminalId: number,
+    tripId: string,
+    correlationId: string,
+  ) {
+    const containers = await tx.containerSnapshot.findMany({
+      where: { currentTrailerId: trailerId },
+    });
+    const containerIds = containers.map((container) => container.id);
+    const packages = await tx.packageSnapshot.findMany({
+      where: {
+        OR: [
+          { currentTrailerId: trailerId },
+          ...(containerIds.length
+            ? [{ currentContainerId: { in: containerIds } }]
+            : []),
+        ],
+      },
+    });
+    for (const container of containers) {
+      await tx.containerEvent.create({
+        data: {
+          containerId: container.id,
+          eventType: ContainerEventType.CONTAINER_ARRIVED,
+          correlationId,
+          metadata: { tripId, trailerId, terminalId },
+        },
+      });
+    }
+    if (containerIds.length) {
+      await tx.containerSnapshot.updateMany({
+        where: { id: { in: containerIds } },
+        data: { currentStatus: ContainerStatus.ARRIVED, currentTerminalId: terminalId },
+      });
+    }
+    const packageEventIds: string[] = [];
+    for (const pkg of packages) {
+      const event = await tx.packageEvent.create({
+        data: {
+          packageId: pkg.id,
+          eventType: PackageEventType.PACKAGE_ARRIVED,
+          terminalId,
+          correlationId,
+          metadata: { tripId, trailerId, currentTerminalId: terminalId },
+        },
+      });
+      await tx.packageProjectionOutbox.create({
+        data: { packageEventId: event.id },
+      });
+      packageEventIds.push(event.id);
+    }
+    if (packages.length) {
+      await tx.packageSnapshot.updateMany({
+        where: { id: { in: packages.map((pkg) => pkg.id) } },
+        data: { currentStatus: PackageStatus.ARRIVED, currentTerminalId: terminalId },
+      });
+    }
+    return {
+      packageEventIds,
+      packageCount: packages.length,
+      containerCount: containers.length,
+    };
+  }
+
+  private async processPackageProjections(eventIds: string[]) {
+    for (const eventId of eventIds) {
+      await this.packages.processProjection(eventId);
+    }
   }
 
   private requireStatus(actual: TripStatus, expected: TripStatus, message: string) {

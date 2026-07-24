@@ -51,6 +51,9 @@ describe('UserService', () => {
     terminal: {
       findUnique: jest.fn(),
     },
+    terminalSnapshot: {
+      update: jest.fn(),
+    },
   };
   const prisma = {
     $transaction: jest.fn((callback) => callback(tx)),
@@ -205,6 +208,7 @@ describe('UserService', () => {
     tx.terminal.findUnique.mockResolvedValue({ id: 7, terminalCode: 'YYC' });
     tx.userEvent.create.mockResolvedValue({ eventType: UserEventType.TERMINAL_ASSIGNED, createdAt });
     tx.userSnapshot.update.mockResolvedValue({ userId: 'user-1', currentTerminalId: 7 });
+    tx.terminalSnapshot.update.mockResolvedValue({});
     const result = await service.assignTerminal('user-1', 7);
     expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'user-1' }, data: { primaryTerminalId: 7 } });
     expect(tx.userEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: UserEventType.TERMINAL_ASSIGNED }) });

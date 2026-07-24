@@ -7,17 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Package {
+  id               String                    @id @default(cuid())
+  trackingNumber   String                    @unique
+  packageType      PackageType
+  createdAt        DateTime                  @default(now())
+  snapshot         PackageSnapshot?
+  events           PackageEvent[]
+  shipmentPackages ShipmentPackage[]
+  containerHistory PackageContainerHistory[]
+  trailerHistory   PackageTrailerHistory[]
+}
+
 model PackageSnapshot {
-  id                 String            @id @default(cuid())
-  trackingNumber     String            @unique
+  id                 String        @id @default(cuid())
+  trackingNumber     String        @unique
   packageType        PackageType
   currentStatus      PackageStatus
   currentTerminalId  Int?
-  updatedAt          DateTime          @updatedAt
+  updatedAt          DateTime      @updatedAt
   currentContainerId String?
   currentTrailerId   String?
-  events             PackageEvent[]
-  shipmentPackages   ShipmentPackage[]
+  aggregate          Package       @relation(fields: [id], references: [id], onDelete: Cascade)
 }
 
 model Terminal {
@@ -173,41 +184,42 @@ model Shipment {
 model ShipmentPackage {
   shipmentId String
   packageId  String
-  assignedAt DateTime        @default(now())
-  shipment   Shipment        @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  package    PackageSnapshot @relation(fields: [packageId], references: [id])
+  assignedAt DateTime @default(now())
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  package    Package  @relation(fields: [packageId], references: [id])
 
   @@id([shipmentId, packageId])
   @@unique([packageId])
 }
 
 model ShipmentEvent {
-  id            String            @id @default(cuid())
-  shipmentId    String
-  eventType     ShipmentEventType
-  correlationId String
-  payload       Json?
-  createdAt     DateTime          @default(now())
-  shipment      Shipment          @relation(fields: [shipmentId], references: [id])
+  id                   String            @id @default(cuid())
+  shipmentId           String
+  sourcePackageEventId String?           @unique
+  eventType            ShipmentEventType
+  correlationId        String
+  payload              Json?
+  createdAt            DateTime          @default(now())
+  shipment             Shipment          @relation(fields: [shipmentId], references: [id])
 
   @@index([shipmentId, createdAt])
   @@index([correlationId])
 }
 
 model ShipmentSnapshot {
-  id                String         @id @default(cuid())
-  shipmentId        String         @unique
-  currentStatus     ShipmentStatus @default(CREATED)
-  currentTerminalId Int?
-  packageCount      Int            @default(0)
-  deliveredPackages Int            @default(0)
-  outForDeliveryPackages Int       @default(0)
-  remainingPackages Int            @default(0)
-  progressPercent   Int            @default(0)
-  completedAt       DateTime?
-  lastActivityAt    DateTime?
-  updatedAt         DateTime       @updatedAt
-  shipment          Shipment       @relation(fields: [shipmentId], references: [id])
+  id                     String         @id @default(cuid())
+  shipmentId             String         @unique
+  currentStatus          ShipmentStatus @default(CREATED)
+  currentTerminalId      Int?
+  packageCount           Int            @default(0)
+  deliveredPackages      Int            @default(0)
+  outForDeliveryPackages Int            @default(0)
+  remainingPackages      Int            @default(0)
+  progressPercent        Int            @default(0)
+  completedAt            DateTime?
+  lastActivityAt         DateTime?
+  updatedAt              DateTime       @updatedAt
+  shipment               Shipment       @relation(fields: [shipmentId], references: [id])
 
   @@index([currentStatus])
   @@index([completedAt])
@@ -217,15 +229,15 @@ model ShipmentSnapshot {
 // event stream records each notification action while this row keeps identity
 // and source-event idempotency data.
 model Notification {
-  id            String               @id @default(cuid())
+  id            String                @id @default(cuid())
   shipmentId    String?
-  sourceEventId String               @unique
+  sourceEventId String                @unique
   type          NotificationType
   recipient     String
-  channel       NotificationChannel  @default(IN_APP)
+  channel       NotificationChannel   @default(IN_APP)
   payload       Json?
-  createdAt     DateTime             @default(now())
-  shipment      Shipment?            @relation(fields: [shipmentId], references: [id])
+  createdAt     DateTime              @default(now())
+  shipment      Shipment?             @relation(fields: [shipmentId], references: [id])
   events        NotificationEvent[]
   snapshot      NotificationSnapshot?
 
@@ -342,7 +354,7 @@ model EquipmentAssignment {
   activeTrip Trip?                     @relation("ActiveTripEquipment")
   truck      Truck                     @relation(fields: [truckId], references: [id])
   driver     Driver                    @relation(fields: [driverId], references: [id])
-  trailer    TrailerSnapshot?          @relation(fields: [trailerId], references: [id])
+  trailer    Trailer?                  @relation(fields: [trailerId], references: [id])
 
   @@index([tripId, status])
   @@index([truckId, status])
@@ -575,36 +587,73 @@ model IdentityEvent {
 }
 
 model PackageEvent {
-  id         String           @id @default(cuid())
-  packageId  String
-  eventType  PackageEventType
-  terminalId Int?
-  employeeId Int?
-  metadata   Json?
-  createdAt  DateTime         @default(now())
-  package    PackageSnapshot  @relation(fields: [packageId], references: [id])
+  id            String                   @id @default(cuid())
+  packageId     String
+  eventType     PackageEventType
+  terminalId    Int?
+  employeeId    Int?
+  correlationId String
+  metadata      Json?
+  createdAt     DateTime                 @default(now())
+  package       Package                  @relation(fields: [packageId], references: [id])
+  projection    PackageProjectionOutbox?
+
+  @@index([packageId, createdAt])
+  @@index([correlationId])
+}
+
+// The outbox is written with the package event. Shipment projections can be
+// retried safely after process or network failures without losing the source
+// business event.
+model PackageProjectionOutbox {
+  id             String           @id @default(cuid())
+  packageEventId String           @unique
+  status         ProjectionStatus @default(PENDING)
+  attempts       Int              @default(0)
+  lastError      String?
+  processedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  packageEvent   PackageEvent     @relation(fields: [packageEventId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+}
+
+model Container {
+  id               String                    @id @default(cuid())
+  containerBarcode String                    @unique
+  packageType      PackageType
+  createdAt        DateTime                  @default(now())
+  snapshot         ContainerSnapshot?
+  events           ContainerEvent[]
+  packageHistory   PackageContainerHistory[]
+  trailerHistory   ContainerTrailerHistory[]
 }
 
 model ContainerSnapshot {
-  id                String           @id @default(cuid())
-  containerBarcode  String           @unique
+  id                String          @id @default(cuid())
+  containerBarcode  String          @unique
   packageType       PackageType
   currentStatus     ContainerStatus
   currentTrailerId  String?
   currentTerminalId Int?
-  packageCount      Int              @default(0)
-  updatedAt         DateTime         @updatedAt
-  events            ContainerEvent[]
+  packageCount      Int             @default(0)
+  updatedAt         DateTime        @updatedAt
+  aggregate         Container       @relation(fields: [id], references: [id], onDelete: Cascade)
 }
 
 model ContainerEvent {
-  id          String             @id @default(cuid())
-  containerId String
-  eventType   ContainerEventType
-  employeeId  Int?
-  metadata    Json?
-  createdAt   DateTime           @default(now())
-  container   ContainerSnapshot  @relation(fields: [containerId], references: [id])
+  id            String             @id @default(cuid())
+  containerId   String
+  eventType     ContainerEventType
+  employeeId    Int?
+  correlationId String
+  metadata      Json?
+  createdAt     DateTime           @default(now())
+  container     Container          @relation(fields: [containerId], references: [id])
+
+  @@index([containerId, createdAt])
+  @@index([correlationId])
 }
 
 model PackageContainerHistory {
@@ -613,26 +662,47 @@ model PackageContainerHistory {
   containerId String
   loadedAt    DateTime  @default(now())
   unloadedAt  DateTime?
+  package     Package   @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  container   Container @relation(fields: [containerId], references: [id], onDelete: Restrict)
+
+  @@index([packageId, unloadedAt])
+  @@index([containerId, unloadedAt])
+}
+
+model Trailer {
+  id                   String                    @id @default(cuid())
+  trailerBarcode       String                    @unique
+  createdAt            DateTime                  @default(now())
+  snapshot             TrailerSnapshot?
+  events               TrailerEvent[]
+  equipmentAssignments EquipmentAssignment[]
+  containerHistory     ContainerTrailerHistory[]
+  packageHistory       PackageTrailerHistory[]
 }
 
 model TrailerSnapshot {
-  id                   String                @id @default(cuid())
-  trailerBarcode       String                @unique
-  currentStatus        TrailerStatus
-  containerCount       Int                   @default(0)
-  packageCount         Int                   @default(0)
-  currentTerminalId    Int?
-  updatedAt            DateTime              @updatedAt
-  events               TrailerEvent[]
-  equipmentAssignments EquipmentAssignment[]
+  id                String        @id @default(cuid())
+  trailerBarcode    String        @unique
+  currentStatus     TrailerStatus
+  containerCount    Int           @default(0)
+  packageCount      Int           @default(0)
+  currentTerminalId Int?
+  updatedAt         DateTime      @updatedAt
+  aggregate         Trailer       @relation(fields: [id], references: [id], onDelete: Cascade)
 }
 
 model TrailerEvent {
-  id        String           @id @default(cuid())
-  trailerId String
-  eventType TrailerEventType
-  createdAt DateTime         @default(now())
-  trailer   TrailerSnapshot  @relation(fields: [trailerId], references: [id])
+  id            String           @id @default(cuid())
+  trailerId     String
+  eventType     TrailerEventType
+  employeeId    Int?
+  correlationId String
+  metadata      Json?
+  createdAt     DateTime         @default(now())
+  trailer       Trailer          @relation(fields: [trailerId], references: [id])
+
+  @@index([trailerId, createdAt])
+  @@index([correlationId])
 }
 
 model ContainerTrailerHistory {
@@ -641,6 +711,11 @@ model ContainerTrailerHistory {
   trailerId   String
   loadedAt    DateTime  @default(now())
   unloadedAt  DateTime?
+  container   Container @relation(fields: [containerId], references: [id], onDelete: Restrict)
+  trailer     Trailer   @relation(fields: [trailerId], references: [id], onDelete: Restrict)
+
+  @@index([containerId, unloadedAt])
+  @@index([trailerId, unloadedAt])
 }
 
 model PackageTrailerHistory {
@@ -649,6 +724,11 @@ model PackageTrailerHistory {
   trailerId  String
   loadedAt   DateTime  @default(now())
   unloadedAt DateTime?
+  package    Package   @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  trailer    Trailer   @relation(fields: [trailerId], references: [id], onDelete: Restrict)
+
+  @@index([packageId, unloadedAt])
+  @@index([trailerId, unloadedAt])
 }
 
 enum PackageStatus {
@@ -691,6 +771,10 @@ enum ContainerStatus {
 
 enum ContainerEventType {
   CONTAINER_CREATED
+  PACKAGE_LOADED
+  PACKAGE_UNLOADED
+  CONTAINER_LOADED_TO_TRAILER
+  CONTAINER_UNLOADED_FROM_TRAILER
   CONTAINER_CLOSED
   CONTAINER_DEPARTED
   CONTAINER_ARRIVED
@@ -711,6 +795,8 @@ enum TrailerEventType {
 
   CONTAINER_LOADED_TO_TRAILER
   CONTAINER_UNLOADED_FROM_TRAILER
+  PACKAGE_LOADED_TO_TRAILER
+  PACKAGE_UNLOADED_FROM_TRAILER
 }
 
 enum TerminalStatus {
@@ -729,6 +815,8 @@ enum TerminalEventType {
   CONTAINER_TRANSFERRED
   TRAILER_ARRIVED
   TRAILER_DEPARTED
+  TRIP_DEPARTED
+  TRIP_ARRIVED
 }
 
 enum TerminalAssetType {
@@ -885,4 +973,11 @@ enum IdentityEventType {
   ROLE_CREATED
   PERMISSION_CREATED
   PERMISSION_ASSIGNED
+}
+
+enum ProjectionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }

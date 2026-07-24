@@ -5,6 +5,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { trailerIdentifier } from './support/asset-identifiers';
+import { createOperationalTestingModule } from './support/operational-testing-module';
 
 const prisma = new PrismaClient();
 
@@ -42,20 +43,19 @@ describe('Fleet (e2e)', () => {
     return response.body.terminal.id as number;
   };
 
-  const createTrailer = async () => {
+  const createTrailer = async (terminalId: number) => {
     // Use the shared generator so this fixture always follows the trailer barcode contract.
     const trailerBarcode = trailerIdentifier();
     const response = await request(app.getHttpServer())
       .post('/trailers')
-      .send({ trailerBarcode })
+      .send({ trailerBarcode, terminalId })
       .expect(201);
     return response.body.snapshot.id as string;
   };
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    const moduleFixture: TestingModule =
+      await createOperationalTestingModule();
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
       new ValidationPipe({
@@ -206,7 +206,7 @@ describe('Fleet (e2e)', () => {
     const trip = (await request(app.getHttpServer()).post('/trips').send({ tripNumber: unique('FLTTRIP'), routeId: route.id, plannedDeparture: new Date(Date.now() + 3600000).toISOString() }).expect(201)).body.trip;
     const truck = (await request(app.getHttpServer()).post('/fleet/trucks').send({ purpose: TruckPurpose.MIDDLE_MILE, licensePlate: unique('APLT'), terminalId: originTerminalId }).expect(201)).body.truck;
     const driver = (await request(app.getHttpServer()).post('/fleet/drivers').send({ employeeId: unique('ADRV'), licenseNumber: unique('ALIC'), licenseClass: 'Class 1', terminalId: originTerminalId }).expect(201)).body.driver;
-    const trailerId = await createTrailer();
+    const trailerId = await createTrailer(originTerminalId);
 
     const availableBefore = await request(app.getHttpServer()).get('/fleet/availability').expect(200);
     expect(availableBefore.body.trailers.some((item: any) => item.id === trailerId)).toBe(true);

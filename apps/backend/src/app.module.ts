@@ -29,6 +29,7 @@ import { FleetModule } from './modules/fleet/fleet.module';
 import { NotificationModule } from './modules/notifications/notification.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
+import { SnapshotModule } from './modules/snapshots/snapshot.module';
 
 @Module({
   imports: [
@@ -72,6 +73,8 @@ import { ReportingModule } from './modules/reporting/reporting.module';
     TrackingModule,
 
     ReportingModule,
+
+    SnapshotModule,
   ],
 })
 export class AppModule implements NestModule {

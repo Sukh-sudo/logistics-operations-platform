@@ -7,9 +7,12 @@ describe('JwtAuthGuard', () => {
   const request = { headers: { authorization: 'Bearer valid-token' } };
   const context = {
     switchToHttp: () => ({ getRequest: () => request }),
+    getHandler: () => undefined,
+    getClass: () => undefined,
   } as unknown as ExecutionContext;
   const jwt = { verifyAsync: jest.fn() };
   const prisma = { user: { findUnique: jest.fn() } };
+  const reflector = { getAllAndOverride: jest.fn().mockReturnValue(false) };
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -31,7 +34,7 @@ describe('JwtAuthGuard', () => {
     });
 
     await expect(
-      new JwtAuthGuard(jwt as never, prisma as never).canActivate(context),
+      new JwtAuthGuard(jwt as never, prisma as never, reflector as never).canActivate(context),
     ).resolves.toBe(true);
     expect((request as never as { user: { roles: string[] } }).user.roles).toEqual([
       'DISPATCHER',
@@ -50,7 +53,16 @@ describe('JwtAuthGuard', () => {
     });
 
     await expect(
-      new JwtAuthGuard(jwt as never, prisma as never).canActivate(context),
+      new JwtAuthGuard(jwt as never, prisma as never, reflector as never).canActivate(context),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('allows endpoints explicitly marked public without a token', async () => {
+    reflector.getAllAndOverride.mockReturnValueOnce(true);
+
+    await expect(
+      new JwtAuthGuard(jwt as never, prisma as never, reflector as never).canActivate(context),
+    ).resolves.toBe(true);
+    expect(jwt.verifyAsync).not.toHaveBeenCalled();
   });
 });

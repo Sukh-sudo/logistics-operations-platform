@@ -252,7 +252,7 @@ async getRecentEvents(filters: DashboardQueryDto = {}, limit = 25) {
       where: {
         ...(eventDate && { createdAt: eventDate }),
         ...(Object.keys(packageSnapshotWhere).length > 0 && {
-          package: packageSnapshotWhere,
+          package: { snapshot: packageSnapshotWhere },
         }),
       },
       take: limit,
@@ -274,7 +274,7 @@ async getRecentEvents(filters: DashboardQueryDto = {}, limit = 25) {
       where: {
         ...(eventDate && { createdAt: eventDate }),
         ...(Object.keys(containerSnapshotWhere).length > 0 && {
-          container: containerSnapshotWhere,
+          container: { snapshot: containerSnapshotWhere },
         }),
       },
       take: limit,
@@ -296,7 +296,7 @@ async getRecentEvents(filters: DashboardQueryDto = {}, limit = 25) {
       where: {
         ...(eventDate && { createdAt: eventDate }),
         ...(Object.keys(trailerSnapshotWhere).length > 0 && {
-          trailer: trailerSnapshotWhere,
+          trailer: { snapshot: trailerSnapshotWhere },
         }),
       },
       take: limit,

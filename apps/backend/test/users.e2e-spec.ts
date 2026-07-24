@@ -82,6 +82,7 @@ describe('Users (e2e)', () => {
 
     const terminal = await request(app.getHttpServer())
       .post('/terminals')
+      .set('Authorization', authorization)
       .send({ terminalCode: unique('UT'), city: 'Calgary', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton' })
       .expect(201);
     const terminalAssignment = await request(app.getHttpServer())
