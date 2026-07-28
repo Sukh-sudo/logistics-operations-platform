@@ -361,12 +361,21 @@ http://localhost:3000/api/docs
 ```
 apps/
     backend/
+    dashboard/
+    handheld-simulator/
 
 docs/
 
 README.md
 
 PROJECT_SPEC.md
+```
+
+The handheld simulator runs on port `5174` and proxies its mobile API requests
+to the backend:
+
+```bash
+pnpm --filter handheld-simulator dev
 ```
 
 ---

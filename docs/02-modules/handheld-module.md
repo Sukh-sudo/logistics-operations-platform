@@ -56,6 +56,28 @@ without executing the aggregate service again.
 - Android resolved history retention is eight hours; unresolved outbox work
   must not be purged.
 
+## Browser simulator
+
+`apps/handheld-simulator` is the implemented portfolio and workflow-testing
+client for this module. It is a responsive React/Vite application that:
+
+- Authenticates with badge and employee number and caches terminal bootstrap
+  context for an already authenticated offline shift.
+- Starts, resumes, pauses, and completes server task sessions.
+- Presents trailer, container, last-mile, and courier workflows.
+- Saves every operational command to a local outbox before attempting network
+  delivery.
+- Synchronizes queued commands in device-time order and maps durable
+  accepted, rejected, duplicate, and reversed results into local history.
+- Retains unresolved work indefinitely and purges only resolved history after
+  the configured eight-hour window.
+- Uses the snapshot lookup endpoints and never derives authoritative aggregate
+  state in the browser.
+
+The browser's network control deliberately simulates connectivity loss.
+Browser local storage stands in for the Android Room database; it is suitable
+for demos but is not presented as secure production device storage.
+
 ## Deferred client capabilities
 
 The native Android runtime requires a JDK and Android SDK. CameraX/ML Kit,

@@ -532,6 +532,11 @@ Every scan uses a unique `clientEventId`. Parsed synchronization batches
 return one durable result per command with `ACCEPTED`, `REJECTED`,
 `DUPLICATE_ACCEPTED`, or `REVERSED`.
 
+The browser client in `apps/handheld-simulator` consumes this contract through
+a same-origin Vite development proxy. It persists commands before transmission
+and submits only the documented scan DTO fields; local outbox metadata is
+never sent to the API.
+
 Supervisor reads extend the existing dashboard API:
 
 ```text

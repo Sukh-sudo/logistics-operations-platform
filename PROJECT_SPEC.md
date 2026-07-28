@@ -245,6 +245,7 @@ The current implementation includes:
 - Search
 - Health
 - Handheld workflow API
+- Browser-based handheld workflow simulator
 
 ---
 
@@ -905,6 +906,10 @@ apps/
 
 backend/
 
+dashboard/
+
+handheld-simulator/
+
 src/
 
 modules/
@@ -1072,6 +1077,7 @@ Future
 | Search | ✅ Implemented |
 | Health | ✅ Implemented |
 | Handheld workflow API | ✅ Implemented |
+| Handheld simulator | ✅ Implemented |
 | Terminal | 📋 Planned |
 | Route | 📋 Planned |
 | Trip | 📋 Planned |
