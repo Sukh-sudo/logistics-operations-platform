@@ -17,6 +17,12 @@ export class CreateUserDto {
   @MaxLength(40)
   employeeNumber: string;
 
+  @ApiPropertyOptional({ example: 'EMP-BADGE-12345' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  badgeBarcode?: string;
+
   @ApiProperty({ example: 'operator@example.com' })
   @IsEmail()
   @MaxLength(254)

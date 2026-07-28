@@ -8,5 +8,6 @@ import { PackageModule } from '../packages/package.module';
   imports: [PackageModule],
   controllers: [ContainerController],
   providers: [ContainerService],
+  exports: [ContainerService],
 })
 export class ContainerModule {}

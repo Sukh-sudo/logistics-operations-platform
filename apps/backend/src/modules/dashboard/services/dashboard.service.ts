@@ -8,12 +8,222 @@ import {
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { DashboardQueryDto } from '../dto/dashboard-query.dto';
+import { HandheldDashboardQueryDto } from '../dto/handheld-dashboard-query.dto';
 
 @Injectable()
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
   ) {}
+
+  async getHandheldKpis(filters: HandheldDashboardQueryDto = {}) {
+    const sessions = await this.prisma.handheldTaskSession.findMany({
+      where: this.handheldSessionWhere(filters),
+      include: { snapshot: true, intervals: true },
+    });
+    const sessionIds = sessions.map((session) => session.id);
+    const receiptWhere: Prisma.HandheldCommandReceiptWhereInput = {
+      taskSessionId: { in: sessionIds },
+      ...(filters.action && { action: filters.action }),
+      ...(this.handheldDateRange(filters) && {
+        serverReceivedAt: this.handheldDateRange(filters),
+      }),
+    };
+    const grouped = await this.prisma.handheldCommandReceipt.groupBy({
+      by: ['resultStatus'],
+      where: receiptWhere,
+      _count: { _all: true },
+    });
+    const counts = Object.fromEntries(
+      grouped.map((item) => [item.resultStatus, item._count._all]),
+    );
+    const productiveActions = [
+      'LOAD_PACKAGE_TO_TRAILER',
+      'UNLOAD_PACKAGE_FROM_TRAILER',
+      'LOAD_PACKAGE_TO_CONTAINER',
+      'UNLOAD_PACKAGE_FROM_CONTAINER',
+      'LOAD_PACKAGE_TO_ROUTE',
+      'REMOVE_PACKAGE_FROM_ROUTE',
+      'PACKAGE_OUT_FOR_DELIVERY',
+      'PACKAGE_DELIVERED',
+      'PACKAGE_ATTEMPTED_DELIVERY',
+      'PACKAGE_DAMAGED',
+      'PACKAGE_MISROUTED',
+      'PACKAGE_RETURNED_TO_TERMINAL',
+    ] as const;
+    const productivePackages =
+      sessionIds.length === 0
+        ? 0
+        : await this.prisma.handheldCommandReceipt.count({
+            where: {
+              ...receiptWhere,
+              action: { in: [...productiveActions] },
+              resultStatus: 'ACCEPTED',
+              reversedAt: null,
+            },
+          });
+    const duplicateAggregate =
+      sessionIds.length === 0
+        ? { _sum: { duplicateCount: null } }
+        : await this.prisma.handheldCommandReceipt.aggregate({
+            where: receiptWhere,
+            _sum: { duplicateCount: true },
+          });
+    const [
+      damagedPackages,
+      misroutedPackages,
+      gpsMissingEvents,
+      synchronizationFailures,
+      closedContainersNotLoaded,
+    ] = await Promise.all([
+      this.prisma.handheldCommandReceipt.count({
+        where: {
+          ...receiptWhere,
+          action: 'PACKAGE_DAMAGED',
+          resultStatus: 'ACCEPTED',
+          reversedAt: null,
+        },
+      }),
+      this.prisma.handheldCommandReceipt.count({
+        where: {
+          ...receiptWhere,
+          action: 'PACKAGE_MISROUTED',
+          resultStatus: 'ACCEPTED',
+          reversedAt: null,
+        },
+      }),
+      this.prisma.handheldCommandReceipt.count({
+        where: { ...receiptWhere, exceptionFlags: { has: 'GPS_MISSING' } },
+      }),
+      this.prisma.handheldCommandReceipt.count({
+        where: { ...receiptWhere, code: 'SYNC_TRANSPORT_FAILURE' },
+      }),
+      this.prisma.containerSnapshot.count({
+        where: {
+          currentStatus: 'CLOSED',
+          currentTrailerId: null,
+          ...(filters.terminalId !== undefined && {
+            currentTerminalId: filters.terminalId,
+          }),
+        },
+      }),
+    ]);
+    const activeSeconds = sessions.reduce(
+      (total, session) =>
+        total +
+        session.intervals.reduce((intervalTotal, interval) => {
+          const end = interval.endedAt ?? new Date();
+          return (
+            intervalTotal +
+            Math.max(0, end.getTime() - interval.startedAt.getTime()) / 1000
+          );
+        }, 0),
+      0,
+    );
+    return {
+      acceptedPackages: productivePackages,
+      rejectedScans: counts.REJECTED ?? 0,
+      duplicateScans: duplicateAggregate._sum.duplicateCount ?? 0,
+      reversals: counts.REVERSED ?? 0,
+      damagedPackages,
+      misroutedPackages,
+      gpsMissingEvents,
+      synchronizationFailures,
+      closedContainersNotLoaded,
+      activeEmployees: new Set(
+        sessions
+          .filter((item) => item.snapshot?.currentState === 'ACTIVE')
+          .map((item) => item.employeeId),
+      ).size,
+      operationallyInactiveEmployees: new Set(
+        sessions
+          .filter((item) => item.snapshot?.currentState === 'INACTIVE_OFFLINE')
+          .map((item) => item.employeeId),
+      ).size,
+      activeSeconds,
+      terminalPackagesPerHour:
+        activeSeconds > 0
+          ? Number((productivePackages / (activeSeconds / 3600)).toFixed(2))
+          : 0,
+    };
+  }
+
+  getHandheldEmployees(filters: HandheldDashboardQueryDto = {}) {
+    return this.prisma.handheldTaskSession.findMany({
+      where: this.handheldSessionWhere(filters),
+      include: {
+        employee: { include: { snapshot: true } },
+        snapshot: true,
+        intervals: true,
+        commands: {
+          where: {
+            ...(filters.action && { action: filters.action }),
+            ...(this.handheldDateRange(filters) && {
+              serverReceivedAt: this.handheldDateRange(filters),
+            }),
+          },
+          orderBy: { serverReceivedAt: 'desc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  getHandheldExceptions(filters: HandheldDashboardQueryDto = {}) {
+    return this.prisma.handheldCommandReceipt.findMany({
+      where: {
+        taskSession: this.handheldSessionWhere(filters),
+        ...(filters.action && { action: filters.action }),
+        OR: [
+          { resultStatus: 'REJECTED' },
+          { exceptionFlags: { isEmpty: false } },
+        ],
+        ...(this.handheldDateRange(filters) && {
+          serverReceivedAt: this.handheldDateRange(filters),
+        }),
+      },
+      orderBy: { serverReceivedAt: 'desc' },
+    });
+  }
+
+  getClosedContainersNotLoaded(filters: HandheldDashboardQueryDto = {}) {
+    return this.prisma.containerSnapshot.findMany({
+      where: {
+        currentStatus: 'CLOSED',
+        currentTrailerId: null,
+        ...(filters.terminalId !== undefined && {
+          currentTerminalId: filters.terminalId,
+        }),
+      },
+      orderBy: { updatedAt: 'asc' },
+    });
+  }
+
+  private handheldSessionWhere(
+    filters: HandheldDashboardQueryDto,
+  ): Prisma.HandheldTaskSessionWhereInput {
+    return {
+      ...(filters.terminalId !== undefined && {
+        terminalId: filters.terminalId,
+      }),
+      ...(filters.employeeId && { employeeId: filters.employeeId }),
+      ...(filters.taskType && { taskType: filters.taskType }),
+      ...(filters.deviceId && { deviceId: filters.deviceId }),
+      ...(this.handheldDateRange(filters) && {
+        createdAt: this.handheldDateRange(filters),
+      }),
+    };
+  }
+
+  private handheldDateRange(
+    filters: HandheldDashboardQueryDto,
+  ): Prisma.DateTimeFilter | undefined {
+    if (!filters.from && !filters.to) return undefined;
+    return {
+      ...(filters.from && { gte: new Date(filters.from) }),
+      ...(filters.to && { lte: new Date(filters.to) }),
+    };
+  }
 
   async getSummary(filters: DashboardQueryDto = {}) {
     const snapshotDate = this.getInclusiveDateRange(filters);
@@ -48,6 +258,10 @@ export class DashboardService {
       arrived,
       outForDelivery,
       delivered,
+      attemptedDelivery,
+      damaged,
+      misrouted,
+      returnedToTerminal,
 
       openContainers,
       closedContainers,
@@ -66,6 +280,10 @@ export class DashboardService {
       countPackages(PackageStatus.ARRIVED),
       countPackages(PackageStatus.OUT_FOR_DELIVERY),
       countPackages(PackageStatus.DELIVERED),
+      countPackages(PackageStatus.ATTEMPTED_DELIVERY),
+      countPackages(PackageStatus.DAMAGED),
+      countPackages(PackageStatus.MISROUTED),
+      countPackages(PackageStatus.RETURNED_TO_TERMINAL),
 
       // Container counts
       this.prisma.containerSnapshot.count({
@@ -108,6 +326,10 @@ export class DashboardService {
         arrived,
         outForDelivery,
         delivered,
+        attemptedDelivery,
+        damaged,
+        misrouted,
+        returnedToTerminal,
       },
 
       containers: {

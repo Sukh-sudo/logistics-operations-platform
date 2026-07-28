@@ -244,6 +244,7 @@ The current implementation includes:
 - Dashboard
 - Search
 - Health
+- Handheld workflow API
 
 ---
 
@@ -1070,6 +1071,7 @@ Future
 | Dashboard | ✅ Implemented |
 | Search | ✅ Implemented |
 | Health | ✅ Implemented |
+| Handheld workflow API | ✅ Implemented |
 | Terminal | 📋 Planned |
 | Route | 📋 Planned |
 | Trip | 📋 Planned |

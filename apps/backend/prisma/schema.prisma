@@ -28,31 +28,34 @@ model PackageSnapshot {
   updatedAt          DateTime      @updatedAt
   currentContainerId String?
   currentTrailerId   String?
+  currentRouteId     String?
+  currentTruckId     String?
   aggregate          Package       @relation(fields: [id], references: [id], onDelete: Cascade)
 }
 
 model Terminal {
-  id                   Int                 @id @default(autoincrement())
-  terminalCode         String              @unique
+  id                   Int                   @id @default(autoincrement())
+  terminalCode         String                @unique
   name                 String
   city                 String
   province             String
   country              String
   timezone             String
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
   events               TerminalEvent[]
   snapshot             TerminalSnapshot?
-  originatingRoutes    Route[]             @relation("RouteOriginTerminal")
-  destinationRoutes    Route[]             @relation("RouteDestinationTerminal")
+  originatingRoutes    Route[]               @relation("RouteOriginTerminal")
+  destinationRoutes    Route[]               @relation("RouteDestinationTerminal")
   routeStops           RouteStop[]
   tripStops            TripStop[]
-  originatingShipments Shipment[]          @relation("ShipmentOriginTerminal")
-  destinationShipments Shipment[]          @relation("ShipmentDestinationTerminal")
+  originatingShipments Shipment[]            @relation("ShipmentOriginTerminal")
+  destinationShipments Shipment[]            @relation("ShipmentDestinationTerminal")
   primaryUsers         User[]
   trucks               Truck[]
   drivers              Driver[]
   fleetUnitSequences   FleetUnitSequence[]
+  handheldSessions     HandheldTaskSession[]
 }
 
 // Each normalized city owns a sequence used to generate readable terminal
@@ -465,20 +468,23 @@ model TerminalSnapshot {
 }
 
 model User {
-  id                String         @id @default(cuid())
-  employeeNumber    String         @unique
-  email             String         @unique
+  id                String                   @id @default(cuid())
+  employeeNumber    String                   @unique
+  email             String                   @unique
   firstName         String
   lastName          String
   passwordHash      String?
-  tokenVersion      Int            @default(0)
-  createdAt         DateTime       @default(now())
+  tokenVersion      Int                      @default(0)
+  createdAt         DateTime                 @default(now())
   events            UserEvent[]
   snapshot          UserSnapshot?
   roles             UserRole[]
   refreshTokens     RefreshToken[]
   primaryTerminalId Int?
-  primaryTerminal   Terminal?      @relation(fields: [primaryTerminalId], references: [id])
+  primaryTerminal   Terminal?                @relation(fields: [primaryTerminalId], references: [id])
+  badgeBarcode      String?                  @unique
+  handheldSessions  HandheldTaskSession[]
+  handheldCommands  HandheldCommandReceipt[]
 
   @@index([primaryTerminalId])
 }
@@ -587,16 +593,17 @@ model IdentityEvent {
 }
 
 model PackageEvent {
-  id            String                   @id @default(cuid())
-  packageId     String
-  eventType     PackageEventType
-  terminalId    Int?
-  employeeId    Int?
-  correlationId String
-  metadata      Json?
-  createdAt     DateTime                 @default(now())
-  package       Package                  @relation(fields: [packageId], references: [id])
-  projection    PackageProjectionOutbox?
+  id              String                   @id @default(cuid())
+  packageId       String
+  eventType       PackageEventType
+  terminalId      Int?
+  employeeId      Int?
+  correlationId   String
+  metadata        Json?
+  createdAt       DateTime                 @default(now())
+  package         Package                  @relation(fields: [packageId], references: [id])
+  projection      PackageProjectionOutbox?
+  handheldCommand HandheldCommandReceipt?  @relation("HandheldDomainEvent")
 
   @@index([packageId, createdAt])
   @@index([correlationId])
@@ -705,6 +712,106 @@ model TrailerEvent {
   @@index([correlationId])
 }
 
+// A task session is the handheld aggregate identity. Its immutable events are
+// the source of truth and HandheldTaskSessionSnapshot is its rebuildable read model.
+model HandheldTaskSession {
+  id         String                       @id @default(cuid())
+  employeeId String
+  terminalId Int
+  deviceId   String
+  taskType   HandheldTaskType
+  createdAt  DateTime                     @default(now())
+  employee   User                         @relation(fields: [employeeId], references: [id])
+  terminal   Terminal                     @relation(fields: [terminalId], references: [id])
+  events     HandheldTaskSessionEvent[]
+  snapshot   HandheldTaskSessionSnapshot?
+  commands   HandheldCommandReceipt[]
+  intervals  HandheldTaskInterval[]
+
+  @@index([employeeId, createdAt])
+  @@index([terminalId, createdAt])
+  @@index([deviceId, createdAt])
+}
+
+model HandheldTaskSessionEvent {
+  id            String                   @id @default(cuid())
+  taskSessionId String
+  eventType     HandheldSessionEventType
+  correlationId String
+  payload       Json?
+  createdAt     DateTime                 @default(now())
+  taskSession   HandheldTaskSession      @relation(fields: [taskSessionId], references: [id], onDelete: Restrict)
+
+  @@index([taskSessionId, createdAt])
+  @@index([correlationId])
+}
+
+model HandheldTaskSessionSnapshot {
+  id                     String               @id
+  currentState           HandheldSessionState
+  networkState           HandheldNetworkState
+  selectedTrailerId      String?
+  selectedRouteId        String?
+  selectedTruckId        String?
+  lastAcceptedActivityAt DateTime?
+  updatedAt              DateTime             @updatedAt
+  taskSession            HandheldTaskSession  @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@index([currentState, lastAcceptedActivityAt])
+}
+
+// Intervals make productive time auditable and keep inactivity/PPH calculations
+// independent from mutable duration counters.
+model HandheldTaskInterval {
+  id            String              @id @default(cuid())
+  taskSessionId String
+  startedAt     DateTime
+  endedAt       DateTime?
+  taskSession   HandheldTaskSession @relation(fields: [taskSessionId], references: [id], onDelete: Restrict)
+
+  @@index([taskSessionId, startedAt])
+}
+
+// This receipt is the idempotency boundary between an unreliable device and
+// immutable domain events. Accepted receipts are never edited by clients.
+model HandheldCommandReceipt {
+  id                    String                   @id @default(cuid())
+  clientEventId         String                   @unique
+  taskSessionId         String
+  employeeId            String
+  action                HandheldAction
+  resultStatus          HandheldResultStatus
+  code                  String
+  message               String
+  deviceId              String
+  deviceTimestamp       DateTime
+  serverReceivedAt      DateTime                 @default(now())
+  networkStateAtCapture HandheldNetworkState
+  trackingNumber        String?
+  containerBarcode      String?
+  trailerBarcode        String?
+  routeCode             String?
+  truckUnitNumber       String?
+  latitude              Decimal?                 @db.Decimal(9, 6)
+  longitude             Decimal?                 @db.Decimal(9, 6)
+  gpsAccuracyMetres     Decimal?                 @db.Decimal(8, 2)
+  gpsCapturedAt         DateTime?
+  exceptionFlags        String[]                 @default([])
+  domainPackageEventId  String?                  @unique
+  originalReceiptId     String?
+  reversedAt            DateTime?
+  duplicateCount        Int                      @default(0)
+  taskSession           HandheldTaskSession      @relation(fields: [taskSessionId], references: [id], onDelete: Restrict)
+  employee              User                     @relation(fields: [employeeId], references: [id])
+  domainPackageEvent    PackageEvent?            @relation("HandheldDomainEvent", fields: [domainPackageEventId], references: [id], onDelete: Restrict)
+  originalReceipt       HandheldCommandReceipt?  @relation("HandheldReversal", fields: [originalReceiptId], references: [id], onDelete: Restrict)
+  reversals             HandheldCommandReceipt[] @relation("HandheldReversal")
+
+  @@index([taskSessionId, serverReceivedAt])
+  @@index([employeeId, serverReceivedAt])
+  @@index([resultStatus, serverReceivedAt])
+}
+
 model ContainerTrailerHistory {
   id          String    @id @default(cuid())
   containerId String
@@ -740,6 +847,10 @@ enum PackageStatus {
   ARRIVED
   OUT_FOR_DELIVERY
   DELIVERED
+  ATTEMPTED_DELIVERY
+  DAMAGED
+  MISROUTED
+  RETURNED_TO_TERMINAL
 }
 
 enum PackageType {
@@ -760,6 +871,12 @@ enum PackageEventType {
   PACKAGE_ARRIVED
   PACKAGE_OUT_FOR_DELIVERY
   PACKAGE_DELIVERED
+  PACKAGE_ATTEMPTED_DELIVERY
+  PACKAGE_DAMAGED
+  PACKAGE_MISROUTED
+  PACKAGE_RETURNED_TO_TERMINAL
+  PACKAGE_LOADED_TO_LAST_MILE
+  PACKAGE_REMOVED_FROM_LAST_MILE
 }
 
 enum ContainerStatus {
@@ -981,4 +1098,62 @@ enum ProjectionStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+enum HandheldTaskType {
+  TRAILER_LOAD
+  TRAILER_UNLOAD
+  CONTAINER_LOAD
+  CONTAINER_UNLOAD
+  LAST_MILE_LOADING
+  COURIER_DELIVERY
+}
+
+enum HandheldSessionState {
+  ACTIVE
+  PAUSED
+  INACTIVE_OFFLINE
+  COMPLETED
+}
+
+enum HandheldNetworkState {
+  ONLINE
+  OFFLINE_NETWORK
+}
+
+enum HandheldSessionEventType {
+  SESSION_STARTED
+  SESSION_PAUSED
+  SESSION_RESUMED
+  SESSION_COMPLETED
+  SESSION_MARKED_INACTIVE
+  OPERATIONAL_ACTIVITY_ACCEPTED
+  CONTEXT_CHANGED
+}
+
+enum HandheldAction {
+  LOAD_PACKAGE_TO_TRAILER
+  UNLOAD_PACKAGE_FROM_TRAILER
+  LOAD_PACKAGE_TO_CONTAINER
+  UNLOAD_PACKAGE_FROM_CONTAINER
+  LOAD_CONTAINER_TO_TRAILER
+  UNLOAD_CONTAINER_FROM_TRAILER
+  CLOSE_CONTAINER
+  CLOSE_TRAILER
+  LOAD_PACKAGE_TO_ROUTE
+  REMOVE_PACKAGE_FROM_ROUTE
+  PACKAGE_OUT_FOR_DELIVERY
+  PACKAGE_DELIVERED
+  PACKAGE_ATTEMPTED_DELIVERY
+  PACKAGE_DAMAGED
+  PACKAGE_MISROUTED
+  PACKAGE_RETURNED_TO_TERMINAL
+  REVERSE_EVENT
+}
+
+enum HandheldResultStatus {
+  ACCEPTED
+  REJECTED
+  DUPLICATE_ACCEPTED
+  REVERSED
 }

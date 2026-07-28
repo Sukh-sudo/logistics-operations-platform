@@ -8,5 +8,6 @@ import { PackageModule } from '../packages/package.module';
   imports: [PackageModule],
   controllers: [TrailerController],
   providers: [TrailerService],
+  exports: [TrailerService],
 })
 export class TrailerModule {}

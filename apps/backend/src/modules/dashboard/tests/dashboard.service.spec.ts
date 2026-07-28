@@ -11,6 +11,12 @@ describe('DashboardService filters', () => {
     packageEvent: { findMany: jest.fn() },
     containerEvent: { findMany: jest.fn() },
     trailerEvent: { findMany: jest.fn() },
+    handheldTaskSession: { findMany: jest.fn() },
+    handheldCommandReceipt: {
+      groupBy: jest.fn(),
+      count: jest.fn(),
+      aggregate: jest.fn(),
+    },
   };
   let service: DashboardService;
 
@@ -22,6 +28,12 @@ describe('DashboardService filters', () => {
     prisma.packageEvent.findMany.mockResolvedValue([]);
     prisma.containerEvent.findMany.mockResolvedValue([]);
     prisma.trailerEvent.findMany.mockResolvedValue([]);
+    prisma.handheldTaskSession.findMany.mockResolvedValue([]);
+    prisma.handheldCommandReceipt.groupBy.mockResolvedValue([]);
+    prisma.handheldCommandReceipt.count.mockResolvedValue(0);
+    prisma.handheldCommandReceipt.aggregate.mockResolvedValue({
+      _sum: { duplicateCount: 0 },
+    });
     service = new DashboardService(prisma as unknown as PrismaService);
   });
 
@@ -96,5 +108,39 @@ describe('DashboardService filters', () => {
     await expect(service.getSummary({ fromDate: '2026-07-03', toDate: '2026-07-02' }))
       .rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.packageSnapshot.count).not.toHaveBeenCalled();
+  });
+
+  it('calculates terminal PPH from accepted scans and aggregate active time', async () => {
+    prisma.handheldTaskSession.findMany.mockResolvedValue([
+      {
+        id: 'session-1',
+        employeeId: 'employee-1',
+        snapshot: { currentState: 'ACTIVE' },
+        intervals: [
+          {
+            startedAt: new Date('2026-07-28T10:00:00Z'),
+            endedAt: new Date('2026-07-28T11:00:00Z'),
+          },
+        ],
+      },
+    ]);
+    prisma.handheldCommandReceipt.count.mockResolvedValue(24);
+    prisma.handheldCommandReceipt.aggregate.mockResolvedValue({
+      _sum: { duplicateCount: 2 },
+    });
+    prisma.handheldCommandReceipt.groupBy.mockResolvedValue([
+      { resultStatus: 'REJECTED', _count: { _all: 3 } },
+    ]);
+
+    const result = await service.getHandheldKpis({ terminalId: 7 });
+
+    expect(result).toMatchObject({
+      acceptedPackages: 24,
+      rejectedScans: 3,
+      duplicateScans: 2,
+      activeEmployees: 1,
+      activeSeconds: 3600,
+      terminalPackagesPerHour: 24,
+    });
   });
 });

@@ -14,6 +14,7 @@ import { CreateContainerDto } from '../dto/create-container.dto';
 import {Injectable, ConflictException, BadRequestException, NotFoundException,} from '@nestjs/common';
 import { packageTypeFromIdentifier } from '../../../common/domain/asset-identifiers';
 import { PackageService } from '../../packages/services/package.service';
+import type { TransactionHook } from '../../../common/domain/transaction-hook';
 
 @Injectable()
 export class ContainerService {
@@ -111,10 +112,44 @@ export class ContainerService {
     });
   }
 
-    async loadPackage(
+  async closeContainer<T = undefined>(
+    containerId: string,
+    requestId?: string,
+    transactionHook?: TransactionHook<T>,
+  ) {
+    const correlationId = requestId ?? randomUUID();
+    return this.prisma.$transaction(async (tx) => {
+      const container = await tx.containerSnapshot.findUnique({
+        where: { id: containerId },
+      });
+      if (!container) throw new NotFoundException('Container not found');
+      if (container.currentStatus !== ContainerStatus.OPEN) {
+        throw new BadRequestException('Only open containers can be closed');
+      }
+      const event = await tx.containerEvent.create({
+        data: {
+          containerId,
+          eventType: ContainerEventType.CONTAINER_CLOSED,
+          correlationId,
+          metadata: { packageCount: container.packageCount },
+        },
+      });
+      const snapshot = await tx.containerSnapshot.update({
+        where: { id: containerId },
+        data: { currentStatus: ContainerStatus.CLOSED },
+      });
+      const hookResult = transactionHook
+        ? await transactionHook(tx)
+        : undefined;
+      return { snapshot, event, hookResult };
+    });
+  }
+
+    async loadPackage<T = undefined>(
     containerId: string,
     dto: LoadPackageDto,
     requestId?: string,
+    transactionHook?: TransactionHook<T>,
     ) {
     const correlationId = requestId ?? randomUUID();
     const result = await this.prisma.$transaction(async (tx) => {
@@ -220,21 +255,26 @@ export class ContainerService {
         },
         });
 
+        const hookResult = transactionHook
+          ? await transactionHook(tx, packageEvent.id)
+          : undefined;
         return {
         success: true,
         packageId: packageSnapshot.id,
         containerId,
         packageEventId: packageEvent.id,
+        hookResult,
         };
     });
     await this.packages.processProjection(result.packageEventId);
     return result;
     }
 
-    async unloadPackage(
+    async unloadPackage<T = undefined>(
   containerId: string,
   dto: LoadPackageDto,
   requestId?: string,
+  transactionHook?: TransactionHook<T>,
 ) {
   const correlationId = requestId ?? randomUUID();
   const result = await this.prisma.$transaction(async (tx) => {
@@ -336,11 +376,15 @@ export class ContainerService {
       },
     });
 
+    const hookResult = transactionHook
+      ? await transactionHook(tx, packageEvent.id)
+      : undefined;
     return {
       success: true,
       packageId: packageSnapshot.id,
       containerId,
       packageEventId: packageEvent.id,
+      hookResult,
     };
   });
   await this.packages.processProjection(result.packageEventId);

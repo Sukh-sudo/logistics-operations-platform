@@ -13,6 +13,14 @@ describe('AuthService', () => {
     email: 'operator@example.com',
     passwordHash: 'password-hash',
     tokenVersion: 2,
+    employeeNumber: 'EMP-1001',
+    firstName: 'Taylor',
+    lastName: 'Morgan',
+    primaryTerminal: {
+      id: 1,
+      terminalCode: 'YYC',
+      name: 'Calgary-000',
+    },
     snapshot,
   };
   const tx = {
@@ -86,6 +94,29 @@ describe('AuthService', () => {
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(tx.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it('authenticates a matching badge and employee number for an online handheld bootstrap', async () => {
+    const result = await service.loginHandheld({
+      badgeBarcode: ' badge-1001 ',
+      employeeId: ' emp-1001 ',
+      deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+    });
+
+    expect(tx.user.findUnique).toHaveBeenCalledWith({
+      where: { badgeBarcode: 'BADGE-1001' },
+      include: { snapshot: true, primaryTerminal: true },
+    });
+    expect(result).toMatchObject({
+      accessToken: 'access-token',
+      employee: { employeeNumber: 'EMP-1001' },
+      terminal: { terminalCode: 'YYC' },
+    });
+    expect(tx.userEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({ client: 'HANDHELD' }),
+      }),
+    });
   });
 
   it('rotates a valid refresh token and records the event atomically', async () => {

@@ -12,7 +12,7 @@ const renderPage = () => render(<MemoryRouter initialEntries={['/terminals/1']}>
 describe('TerminalDetailPage integration', () => {
   beforeEach(() => {
     vi.mocked(terminalApi.detail).mockResolvedValue({ id: 1, terminalCode: 'YYC', name: 'Calgary Terminal', city: 'Calgary', province: 'Alberta', country: 'Canada', timezone: 'America/Edmonton', createdAt: '2026-07-13T10:00:00Z', updatedAt: '2026-07-13T10:00:00Z', snapshot });
-    vi.mocked(terminalApi.inventory).mockResolvedValue({ terminalId: 1, terminalCode: 'YYC', snapshot, packages: [{ id: 'package-1', trackingNumber: 'PKG-100', packageType: 'CONVEYABLE', currentStatus: 'RECEIVED', currentTerminalId: 1, currentContainerId: null, currentTrailerId: null, updatedAt: '2026-07-13T12:00:00Z' }], containers: [], trailers: [] });
+    vi.mocked(terminalApi.inventory).mockResolvedValue({ terminalId: 1, terminalCode: 'YYC', snapshot, packages: [{ id: 'package-1', trackingNumber: 'PKG-100', packageType: 'CONVEYABLE', currentStatus: 'RECEIVED', currentTerminalId: 1, currentContainerId: null, currentTrailerId: null, currentRouteId: null, currentTruckId: null, updatedAt: '2026-07-13T12:00:00Z' }], containers: [], trailers: [] });
     vi.mocked(terminalApi.operations).mockResolvedValue({ terminalId: 1, terminalCode: 'YYC', status: 'ACTIVE', activeTripCount: 3, employeeCount: 4, lastActivityAt: '2026-07-13T12:00:00Z', recentEvents: [] });
     vi.mocked(terminalApi.history).mockResolvedValue([{ id: 'event-1', terminalId: 1, eventType: 'PACKAGE_RECEIVED', employeeId: 7, correlationId: 'request-1', createdAt: '2026-07-13T12:00:00Z' }]);
   });

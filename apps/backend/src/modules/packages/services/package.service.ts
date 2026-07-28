@@ -15,6 +15,7 @@ import { logApplicationEvent } from '../../../common/utils/logger';
 import { PackageTransitionValidator } from '../validators/package-transition.validator';
 import { packageTypeFromIdentifier } from '../../../common/domain/asset-identifiers';
 import { ShipmentService } from '../../shipments/services/shipment.service';
+import type { TransactionHook } from '../../../common/domain/transaction-hook';
 
 @Injectable()
 export class PackageService {
@@ -32,7 +33,11 @@ export class PackageService {
   private readonly shipmentService: ShipmentService,
 ) {}
 
-  async createPackageEvent(dto: CreatePackageEventDto, requestId?: string,) {
+  async createPackageEvent<T = undefined>(
+    dto: CreatePackageEventDto,
+    requestId?: string,
+    transactionHook?: TransactionHook<T>,
+  ) {
     const correlationId = requestId ?? randomUUID();
 
     // Log workflow start
@@ -120,7 +125,12 @@ export class PackageService {
     const leavesTerminalEvents: PackageEventType[] = [
       ...terminalDepartureEvents,
       PackageEventType.PACKAGE_DELIVERED,
+      PackageEventType.PACKAGE_ATTEMPTED_DELIVERY,
+      PackageEventType.PACKAGE_DAMAGED,
+      PackageEventType.PACKAGE_MISROUTED,
     ];
+    const returnsToTerminal =
+      dto.eventType === PackageEventType.PACKAGE_RETURNED_TO_TERMINAL;
     const leavesTerminal = leavesTerminalEvents.includes(dto.eventType);
     const nextTerminalId = leavesTerminal
       ? null
@@ -132,6 +142,7 @@ export class PackageService {
       !([
         PackageEventType.PACKAGE_ARRIVED,
         PackageEventType.PACKAGE_DELIVERED,
+        PackageEventType.PACKAGE_RETURNED_TO_TERMINAL,
       ] as PackageEventType[]).includes(dto.eventType) &&
       snapshot.currentTerminalId !== dto.terminalId
     ) {
@@ -142,7 +153,8 @@ export class PackageService {
 
     if (
       !isNewPackage &&
-      dto.eventType === PackageEventType.PACKAGE_ARRIVED
+      (dto.eventType === PackageEventType.PACKAGE_ARRIVED ||
+        returnsToTerminal)
     ) {
       if (dto.terminalId === undefined) {
         throw new BadRequestException(
@@ -245,7 +257,8 @@ export class PackageService {
 
     if (
       !isNewPackage &&
-      dto.eventType === PackageEventType.PACKAGE_ARRIVED
+      (dto.eventType === PackageEventType.PACKAGE_ARRIVED ||
+        returnsToTerminal)
     ) {
       const terminalEvent = await tx.terminalEvent.create({
         data: {
@@ -256,7 +269,7 @@ export class PackageService {
           payload: {
             packageId: snapshot.id,
             trackingNumber: snapshot.trackingNumber,
-            reason: 'ARRIVAL',
+            reason: returnsToTerminal ? 'RETURNED_TO_TERMINAL' : 'ARRIVAL',
           },
         },
       });
@@ -280,9 +293,13 @@ export class PackageService {
       },
     });
 
+    const hookResult = transactionHook
+      ? await transactionHook(tx, event.id)
+      : undefined;
     return {
       snapshot: updatedSnapshot,
       event,
+      hookResult,
     };
   });
 
@@ -438,7 +455,89 @@ async retryPendingProjections(limit = 100) {
   for (const item of pending) {
     await this.processProjection(item.packageEventId, staleBefore);
   }
+
   return { processed: pending.length };
+}
+
+async changeLastMileAssignment<T = undefined>(
+  trackingNumber: string,
+  routeCode: string,
+  truckUnitNumber: string,
+  remove: boolean,
+  requestId?: string,
+  transactionHook?: TransactionHook<T>,
+) {
+  const correlationId = requestId ?? randomUUID();
+  const result = await this.prisma.$transaction(async (tx) => {
+    const snapshot = await tx.packageSnapshot.findUnique({
+      where: { trackingNumber },
+    });
+    if (!snapshot) throw new NotFoundException('Package not found');
+    const route = await tx.route.findUnique({
+      where: { routeNumber: routeCode },
+      include: { snapshot: true },
+    });
+    if (!route?.snapshot) throw new NotFoundException('Route not found');
+    const truck = await tx.truck.findUnique({
+      where: { unitNumber: truckUnitNumber },
+    });
+    if (!truck) throw new NotFoundException('Truck not found');
+    if (
+      snapshot.currentTerminalId === null ||
+      route.originTerminalId !== snapshot.currentTerminalId ||
+      truck.terminalId !== snapshot.currentTerminalId
+    ) {
+      throw new BadRequestException(
+        'Package, route, and truck must belong to the same origin terminal',
+      );
+    }
+    if (!remove && (snapshot.currentRouteId || snapshot.currentTruckId)) {
+      throw new BadRequestException('Package is already assigned to last mile');
+    }
+    if (
+      remove &&
+      (snapshot.currentRouteId !== route.id ||
+        snapshot.currentTruckId !== truck.id)
+    ) {
+      throw new BadRequestException(
+        'Package is not assigned to this route and truck',
+      );
+    }
+    const event = await tx.packageEvent.create({
+      data: {
+        packageId: snapshot.id,
+        eventType: remove
+          ? PackageEventType.PACKAGE_REMOVED_FROM_LAST_MILE
+          : PackageEventType.PACKAGE_LOADED_TO_LAST_MILE,
+        terminalId: snapshot.currentTerminalId,
+        correlationId,
+        metadata: {
+          routeId: route.id,
+          routeCode: route.routeNumber,
+          truckId: truck.id,
+          truckUnitNumber: truck.unitNumber,
+          currentStatus: snapshot.currentStatus,
+          currentTerminalId: snapshot.currentTerminalId,
+        },
+      },
+    });
+    await tx.packageProjectionOutbox.create({
+      data: { packageEventId: event.id },
+    });
+    const updatedSnapshot = await tx.packageSnapshot.update({
+      where: { id: snapshot.id },
+      data: {
+        currentRouteId: remove ? null : route.id,
+        currentTruckId: remove ? null : truck.id,
+      },
+    });
+    const hookResult = transactionHook
+      ? await transactionHook(tx, event.id)
+      : undefined;
+    return { snapshot: updatedSnapshot, event, hookResult };
+  });
+  await this.processProjection(result.event.id);
+  return result;
 }
 
 async processProjection(packageEventId: string, staleBefore?: Date) {
@@ -518,6 +617,12 @@ private statusForEvent(eventType: PackageEventType) {
     PACKAGE_ARRIVED: PackageStatus.ARRIVED,
     PACKAGE_OUT_FOR_DELIVERY: PackageStatus.OUT_FOR_DELIVERY,
     PACKAGE_DELIVERED: PackageStatus.DELIVERED,
+    PACKAGE_ATTEMPTED_DELIVERY: PackageStatus.ATTEMPTED_DELIVERY,
+    PACKAGE_DAMAGED: PackageStatus.DAMAGED,
+    PACKAGE_MISROUTED: PackageStatus.MISROUTED,
+    PACKAGE_RETURNED_TO_TERMINAL: PackageStatus.RETURNED_TO_TERMINAL,
+    PACKAGE_LOADED_TO_LAST_MILE: PackageStatus.SORTED,
+    PACKAGE_REMOVED_FROM_LAST_MILE: PackageStatus.SORTED,
   };
   return statuses[eventType];
 }

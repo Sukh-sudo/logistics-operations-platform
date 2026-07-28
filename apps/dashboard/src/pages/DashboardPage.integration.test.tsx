@@ -10,11 +10,12 @@ vi.mock('../services/dashboard.api', () => ({
     summary: vi.fn(),
     events: vi.fn(),
     terminals: vi.fn(),
+    handheldKpis: vi.fn(),
   },
 }));
 
 const summary = {
-  packages: { received: 2, sorted: 1, inContainer: 0, inTrailer: 0, departed: 0, arrived: 0, outForDelivery: 0, delivered: 1 },
+  packages: { received: 2, sorted: 1, inContainer: 0, inTrailer: 0, departed: 0, arrived: 0, outForDelivery: 0, delivered: 1, attemptedDelivery: 0, damaged: 0, misrouted: 0, returnedToTerminal: 0 },
   containers: { open: 2, closed: 1, loaded: 1 },
   trailers: { open: 1, closed: 1, inTransit: 1, arrived: 0 },
 };
@@ -27,6 +28,21 @@ describe('DashboardPage filtering integration', () => {
       { id: 1, terminalCode: 'TEST-CODE-ONE', name: 'Calgary-000', city: 'Calgary' },
       { id: 2, terminalCode: 'TEST-CODE-TWO', name: 'Edmonton-000', city: 'Edmonton' },
     ]);
+    vi.mocked(dashboardApi.handheldKpis).mockResolvedValue({
+      acceptedPackages: 12,
+      rejectedScans: 1,
+      duplicateScans: 2,
+      reversals: 1,
+      damagedPackages: 1,
+      misroutedPackages: 1,
+      gpsMissingEvents: 2,
+      synchronizationFailures: 0,
+      closedContainersNotLoaded: 1,
+      activeEmployees: 3,
+      operationallyInactiveEmployees: 1,
+      activeSeconds: 3600,
+      terminalPackagesPerHour: 12,
+    });
   });
 
   it('sends the combined date, terminal, trailer, and package filters to both reads', async () => {
@@ -52,6 +68,11 @@ describe('DashboardPage filtering integration', () => {
     };
     await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalledWith(expected));
     expect(dashboardApi.events).toHaveBeenCalledWith(expected);
+    await waitFor(() => expect(dashboardApi.handheldKpis).toHaveBeenCalledWith({
+      from: '2026-07-01T00:00:00.000Z',
+      to: '2026-07-22T23:59:59.999Z',
+      terminalId: 2,
+    }));
   });
 
   it('clears every active dashboard filter', async () => {

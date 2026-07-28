@@ -20,6 +20,7 @@ import { UnloadContainerDto } from '../dto/unload-container.dto';
 import { LoadPackageDto } from '../dto/load-package.dto';
 import { UnloadPackageDto } from '../dto/unload-package.dto';
 import { PackageService } from '../../packages/services/package.service';
+import type { TransactionHook } from '../../../common/domain/transaction-hook';
 
 @Injectable()
 export class TrailerService {
@@ -98,10 +99,47 @@ export class TrailerService {
     });
   }
 
-  async loadContainer(
+  async closeTrailer<T = undefined>(
+    trailerId: string,
+    requestId?: string,
+    transactionHook?: TransactionHook<T>,
+  ) {
+    const correlationId = requestId ?? randomUUID();
+    return this.prisma.$transaction(async (tx) => {
+      const trailer = await tx.trailerSnapshot.findUnique({
+        where: { id: trailerId },
+      });
+      if (!trailer) throw new NotFoundException('Trailer not found');
+      if (trailer.currentStatus !== TrailerStatus.OPEN) {
+        throw new BadRequestException('Only open trailers can be closed');
+      }
+      const event = await tx.trailerEvent.create({
+        data: {
+          trailerId,
+          eventType: TrailerEventType.TRAILER_CLOSED,
+          correlationId,
+          metadata: {
+            packageCount: trailer.packageCount,
+            containerCount: trailer.containerCount,
+          },
+        },
+      });
+      const snapshot = await tx.trailerSnapshot.update({
+        where: { id: trailerId },
+        data: { currentStatus: TrailerStatus.CLOSED },
+      });
+      const hookResult = transactionHook
+        ? await transactionHook(tx)
+        : undefined;
+      return { snapshot, event, hookResult };
+    });
+  }
+
+  async loadContainer<T = undefined>(
   trailerId: string,
   dto: LoadContainerDto,
   requestId?: string,
+  transactionHook?: TransactionHook<T>,
 ) {
   const correlationId = requestId ?? randomUUID();
   return this.prisma.$transaction(
@@ -196,19 +234,24 @@ export class TrailerService {
         },
       });
 
+      const hookResult = transactionHook
+        ? await transactionHook(tx)
+        : undefined;
       return {
         success: true,
         trailerId,
         containerId: container.id,
+        hookResult,
       };
     },
   );
 }
 
-async unloadContainer(
+async unloadContainer<T = undefined>(
   trailerId: string,
   dto: UnloadContainerDto,
   requestId?: string,
+  transactionHook?: TransactionHook<T>,
 ) {
   const correlationId = requestId ?? randomUUID();
   return this.prisma.$transaction(
@@ -302,19 +345,24 @@ async unloadContainer(
         },
       });
 
+      const hookResult = transactionHook
+        ? await transactionHook(tx)
+        : undefined;
       return {
         success: true,
         trailerId,
         containerId: container.id,
+        hookResult,
       };
     },
   );
 }
 
-async loadPackage(
+async loadPackage<T = undefined>(
   trailerId: string,
   dto: LoadPackageDto,
   requestId?: string,
+  transactionHook?: TransactionHook<T>,
 ) {
   const correlationId = requestId ?? randomUUID();
   const result = await this.prisma.$transaction(
@@ -411,11 +459,15 @@ async loadPackage(
         },
       });
 
+      const hookResult = transactionHook
+        ? await transactionHook(tx, packageEvent.id)
+        : undefined;
       return {
         success: true,
         packageId: packageSnapshot.id,
         trailerId,
         packageEventId: packageEvent.id,
+        hookResult,
       };
     },
   );
@@ -423,10 +475,11 @@ async loadPackage(
   return result;
 }
 
-async unloadPackage(
+async unloadPackage<T = undefined>(
   trailerId: string,
   dto: UnloadPackageDto,
   requestId?: string,
+  transactionHook?: TransactionHook<T>,
 ) {
   const correlationId = requestId ?? randomUUID();
   const result = await this.prisma.$transaction(
@@ -522,11 +575,15 @@ async unloadPackage(
         },
       });
 
+      const hookResult = transactionHook
+        ? await transactionHook(tx, packageEvent.id)
+        : undefined;
       return {
         success: true,
         packageId: packageSnapshot.id,
         trailerId,
         packageEventId: packageEvent.id,
+        hookResult,
       };
     },
   );

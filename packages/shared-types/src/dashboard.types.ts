@@ -1,5 +1,5 @@
 export interface DashboardSummaryDto {
-  packages: { received: number; sorted: number; inContainer: number; inTrailer: number; departed: number; arrived: number; outForDelivery: number; delivered: number };
+  packages: { received: number; sorted: number; inContainer: number; inTrailer: number; departed: number; arrived: number; outForDelivery: number; delivered: number; attemptedDelivery: number; damaged: number; misrouted: number; returnedToTerminal: number };
   containers: { open: number; closed: number; loaded: number };
   trailers: { open: number; closed: number; inTransit: number; arrived: number };
 }
@@ -8,3 +8,18 @@ export interface DashboardTrailerDto { trailerBarcode: string; status: string; c
 export interface DashboardContainerDto { containerBarcode: string; status: string; packageCount: number; assignedTrailer: string | null; }
 export interface DashboardPackageDto { trackingNumber: string; status: string; containerBarcode: string | null; trailerBarcode: string | null; }
 export interface DashboardTerminalOptionDto { id: number; terminalCode: string; name: string; city: string; }
+export interface HandheldKpiDto {
+  acceptedPackages: number;
+  rejectedScans: number;
+  duplicateScans: number;
+  reversals: number;
+  damagedPackages: number;
+  misroutedPackages: number;
+  gpsMissingEvents: number;
+  synchronizationFailures: number;
+  closedContainersNotLoaded: number;
+  activeEmployees: number;
+  operationallyInactiveEmployees: number;
+  activeSeconds: number;
+  terminalPackagesPerHour: number;
+}

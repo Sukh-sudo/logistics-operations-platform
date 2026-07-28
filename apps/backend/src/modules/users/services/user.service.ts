@@ -91,7 +91,13 @@ export class UserService {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.user.findFirst({
         where: {
-          OR: [{ employeeNumber }, { email }],
+          OR: [
+            { employeeNumber },
+            { email },
+            ...(dto.badgeBarcode
+              ? [{ badgeBarcode: dto.badgeBarcode.trim().toUpperCase() }]
+              : []),
+          ],
         },
       });
 
@@ -110,6 +116,7 @@ export class UserService {
           firstName: dto.firstName.trim(),
           lastName: dto.lastName.trim(),
           passwordHash,
+          badgeBarcode: dto.badgeBarcode?.trim().toUpperCase(),
         },
       });
 
@@ -121,6 +128,7 @@ export class UserService {
           correlationId,
           payload: {
             employeeNumber,
+            badgeBarcode: dto.badgeBarcode?.trim().toUpperCase(),
             email,
             firstName: user.firstName,
             lastName: user.lastName,

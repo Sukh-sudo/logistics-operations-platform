@@ -16,6 +16,7 @@ import { ChangePasswordDto } from '../dto/change-password.dto';
 import { LoginDto } from '../dto/login.dto';
 import type { AccessTokenPayload } from '../interfaces/authenticated-user.interface';
 import { CredentialService } from './credential.service';
+import { HandheldLoginDto } from '../../handheld/dto/handheld-login.dto';
 
 @Injectable()
 export class AuthService {
@@ -68,6 +69,68 @@ export class AuthService {
       });
 
       return issued.response;
+    });
+  }
+
+  /**
+   * Portfolio handheld authentication deliberately uses badge + employee
+   * number. It shares the normal JWT issuer so stronger authentication can be
+   * introduced later without changing downstream authorization.
+   */
+  async loginHandheld(dto: HandheldLoginDto, requestId?: string) {
+    const badgeBarcode = dto.badgeBarcode.trim().toUpperCase();
+    const employeeNumber = dto.employeeId.trim().toUpperCase();
+    return this.prisma.$transaction(async (tx) => {
+      const current = await tx.user.findUnique({
+        where: { badgeBarcode },
+        include: { snapshot: true, primaryTerminal: true },
+      });
+      if (
+        !current ||
+        current.employeeNumber !== employeeNumber ||
+        current.snapshot?.currentStatus !== UserStatus.ACTIVE ||
+        !current.primaryTerminal
+      ) {
+        throw new UnauthorizedException('Invalid employee badge or employee ID');
+      }
+
+      const issued = await this.issueTokens(
+        current.id,
+        current.email,
+        current.tokenVersion,
+        current.snapshot.roleNames,
+        current.snapshot.permissions,
+      );
+      await tx.refreshToken.create({ data: issued.refreshTokenRecord });
+      const event = await tx.userEvent.create({
+        data: {
+          userId: current.id,
+          eventType: UserEventType.USER_AUTHENTICATED,
+          actorUserId: current.id,
+          correlationId: requestId ?? randomUUID(),
+          metadata: { client: 'HANDHELD', deviceId: dto.deviceId },
+        },
+      });
+      await tx.userSnapshot.update({
+        where: { userId: current.id },
+        data: { lastLoginAt: event.createdAt, lastActivityAt: event.createdAt },
+      });
+
+      return {
+        ...issued.response,
+        employee: {
+          id: current.id,
+          employeeNumber: current.employeeNumber,
+          firstName: current.firstName,
+          lastName: current.lastName,
+          roles: current.snapshot.roleNames,
+        },
+        terminal: {
+          id: current.primaryTerminal.id,
+          terminalCode: current.primaryTerminal.terminalCode,
+          name: current.primaryTerminal.name,
+        },
+      };
     });
   }
 

@@ -12,7 +12,7 @@ const renderPage = () => render(<MemoryRouter initialEntries={[`/containers/${co
 describe('ContainerDetailPage integration', () => {
   beforeEach(() => {
     vi.mocked(containerApi.snapshot).mockResolvedValue({ id: 'container-1', containerBarcode, packageType: 'CONVEYABLE', currentStatus: 'OPEN', currentTrailerId: 'TRAILER-9', currentTerminalId: 2, packageCount: 1, updatedAt: '2026-07-08T12:00:00Z' });
-    vi.mocked(containerApi.packages).mockResolvedValue({ containerBarcode, packageCount: 1, packages: [{ id: 'package-1', trackingNumber: 'PKG-100', packageType: 'CONVEYABLE', currentStatus: 'IN_CONTAINER', currentTerminalId: 2, currentContainerId: 'container-1', currentTrailerId: null, updatedAt: '2026-07-08T12:15:00Z' }] });
+    vi.mocked(containerApi.packages).mockResolvedValue({ containerBarcode, packageCount: 1, packages: [{ id: 'package-1', trackingNumber: 'PKG-100', packageType: 'CONVEYABLE', currentStatus: 'IN_CONTAINER', currentTerminalId: 2, currentContainerId: 'container-1', currentTrailerId: null, currentRouteId: null, currentTruckId: null, updatedAt: '2026-07-08T12:15:00Z' }] });
     vi.mocked(containerApi.history).mockResolvedValue([{ id: 'event-1', containerId: 'container-1', eventType: 'CONTAINER_CREATED', employeeId: 7, correlationId: 'request-1', metadata: null, createdAt: '2026-07-08T11:00:00Z' }]);
   });
 

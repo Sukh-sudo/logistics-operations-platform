@@ -4,7 +4,7 @@ import { toSearchResultView } from './searchResult';
 
 describe('toSearchResultView', () => {
   it('maps a package snapshot to its detail route and operational facts', () => {
-    const result: SearchResultDto = { type: 'PACKAGE', data: { id: 'pkg-1', trackingNumber: 'PKG/100', packageType: 'DANGEROUS_GOODS', currentStatus: 'IN_CONTAINER', currentTerminalId: 1, currentContainerId: 'container-1', currentTrailerId: null, updatedAt: '2026-07-07T12:00:00Z' } };
+    const result: SearchResultDto = { type: 'PACKAGE', data: { id: 'pkg-1', trackingNumber: 'PKG/100', packageType: 'DANGEROUS_GOODS', currentStatus: 'IN_CONTAINER', currentTerminalId: 1, currentContainerId: 'container-1', currentTrailerId: null, currentRouteId: null, currentTruckId: null, updatedAt: '2026-07-07T12:00:00Z' } };
     const view = toSearchResultView(result);
     expect(view.detailPath).toBe('/packages/PKG%2F100');
     expect(view.facts).toContainEqual({ label: 'Package type', value: 'DANGEROUS GOODS' });

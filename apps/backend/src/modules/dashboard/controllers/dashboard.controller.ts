@@ -2,6 +2,7 @@ import { Controller, Get, Query } from '@nestjs/common';
 import {ApiOkResponse, ApiOperation, ApiTags,} from '@nestjs/swagger';
 import { DashboardQueryDto } from '../dto/dashboard-query.dto';
 import { DashboardService } from '../services/dashboard.service';
+import { HandheldDashboardQueryDto } from '../dto/handheld-dashboard-query.dto';
 
 @ApiTags('Dashboard')
 @Controller('dashboard')
@@ -9,6 +10,26 @@ export class DashboardController {
   constructor(
     private readonly dashboardService: DashboardService,
   ) {}
+
+@Get('terminal-kpis/handheld')
+getHandheldKpis(@Query() query: HandheldDashboardQueryDto) {
+  return this.dashboardService.getHandheldKpis(query);
+}
+
+@Get('terminal-kpis/handheld/employees')
+getHandheldEmployees(@Query() query: HandheldDashboardQueryDto) {
+  return this.dashboardService.getHandheldEmployees(query);
+}
+
+@Get('terminal-kpis/handheld/exceptions')
+getHandheldExceptions(@Query() query: HandheldDashboardQueryDto) {
+  return this.dashboardService.getHandheldExceptions(query);
+}
+
+@Get('terminal-kpis/handheld/unloaded-containers')
+getClosedContainersNotLoaded(@Query() query: HandheldDashboardQueryDto) {
+  return this.dashboardService.getClosedContainersNotLoaded(query);
+}
 
   @ApiOperation({
   summary: 'Get operational dashboard summary',

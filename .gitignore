@@ -8,6 +8,9 @@ coverage
 
 # Documentation (local design documents)
 /docs/**/*.md
+!/docs/ANDROID_HANDHELD_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md
+!/docs/02-modules/handheld-module.md
+!/docs/04-api/37-api-reference.md
 
 # Local tooling and repository backups
 .continue/

@@ -21,6 +21,17 @@ export class TrailerController {
     return this.trailerService.createTrailer(dto, req.correlationId ?? req.requestId);
   }
 
+  @Post(':trailerId/close')
+  closeTrailer(
+    @Param('trailerId') trailerId: string,
+    @Req() req: RequestWithId,
+  ) {
+    return this.trailerService.closeTrailer(
+      trailerId,
+      req.correlationId ?? req.requestId,
+    );
+  }
+
   @Post(':trailerId/load-container')
 loadContainer(
   @Param('trailerId') trailerId: string,

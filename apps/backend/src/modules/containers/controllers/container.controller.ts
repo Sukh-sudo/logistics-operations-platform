@@ -19,6 +19,17 @@ export class ContainerController {
     return this.containerService.createContainer(dto, req.correlationId ?? req.requestId);
   }
 
+  @Post(':containerId/close')
+  closeContainer(
+    @Param('containerId') containerId: string,
+    @Req() req: RequestWithId,
+  ) {
+    return this.containerService.closeContainer(
+      containerId,
+      req.correlationId ?? req.requestId,
+    );
+  }
+
   @Post(':containerId/load-package')
   loadPackage(
     @Param('containerId') containerId: string,

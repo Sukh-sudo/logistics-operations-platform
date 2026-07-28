@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/ViewStates';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { emptyDashboardFilters, type DashboardFilters } from '../features/dashboard/dashboardFilters';
-import { useDashboardSummary, useDashboardTerminals, useRecentEvents } from '../hooks/useDashboard';
+import { useDashboardSummary, useDashboardTerminals, useHandheldKpis, useRecentEvents } from '../hooks/useDashboard';
 
-const packageStatuses: PackageStatus[] = ['RECEIVED', 'SORTED', 'IN_CONTAINER', 'IN_TRAILER', 'DEPARTED', 'ARRIVED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+const packageStatuses: PackageStatus[] = ['RECEIVED', 'SORTED', 'IN_CONTAINER', 'IN_TRAILER', 'DEPARTED', 'ARRIVED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'ATTEMPTED_DELIVERY', 'DAMAGED', 'MISROUTED', 'RETURNED_TO_TERMINAL'];
 const trailerStatuses: TrailerStatus[] = ['OPEN', 'CLOSED', 'IN_TRANSIT', 'ARRIVED'];
 const total = (values: Record<string, number>) => Object.values(values).reduce((sum, value) => sum + value, 0);
 const time = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
@@ -17,13 +17,14 @@ export function DashboardPage() {
   const summary = useDashboardSummary(filters);
   const events = useRecentEvents(filters);
   const terminals = useDashboardTerminals();
+  const handheld = useHandheldKpis(filters);
   const activeFilters = Object.values(filters).some(Boolean);
   const setFilter = (key: keyof DashboardFilters) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFilters(current => ({ ...current, [key]: event.target.value }));
   };
 
-  if (summary.isLoading || events.isLoading) return <LoadingState/>;
-  if (summary.isError || events.isError || !summary.data) return <ErrorState/>;
+  if (summary.isLoading || events.isLoading || handheld.isLoading) return <LoadingState/>;
+  if (summary.isError || events.isError || handheld.isError || !summary.data) return <ErrorState/>;
 
   const cards = [
     { label: 'Packages tracked', value: total(summary.data.packages), detail: `${summary.data.packages.delivered} delivered`, icon: PackageCheck, tone: 'bg-sky-50 text-sky-700' },
@@ -49,6 +50,22 @@ export function DashboardPage() {
     </div>
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(({ label: cardLabel, value, detail, icon: Icon, tone }) => <section key={cardLabel} className="rounded-2xl border bg-white p-5 shadow-sm"><div className={`grid h-10 w-10 place-items-center rounded-xl ${tone}`}><Icon className="h-5 w-5"/></div><p className="mt-5 text-3xl font-semibold text-slate-900">{value.toLocaleString()}</p><p className="mt-1 text-sm font-medium text-slate-700">{cardLabel}</p><p className="mt-1 text-xs text-slate-400">{detail}</p></section>)}</div>
+    {handheld.data && <section className="rounded-2xl border bg-white p-6 shadow-sm">
+      <div><h3 className="font-semibold text-slate-900">Handheld operations</h3><p className="mt-1 text-sm text-slate-500">Server-accepted productivity and device exceptions for the selected terminal and period.</p></div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div><p className="text-2xl font-semibold text-slate-900">{handheld.data.acceptedPackages.toLocaleString()}</p><p className="text-xs text-slate-500">Accepted package scans</p></div>
+        <div><p className="text-2xl font-semibold text-slate-900">{handheld.data.terminalPackagesPerHour.toLocaleString()}</p><p className="text-xs text-slate-500">Terminal packages/hour</p></div>
+        <div><p className="text-2xl font-semibold text-slate-900">{handheld.data.activeEmployees.toLocaleString()}</p><p className="text-xs text-slate-500">Active employees</p></div>
+        <div><p className="text-2xl font-semibold text-slate-900">{handheld.data.operationallyInactiveEmployees.toLocaleString()}</p><p className="text-xs text-slate-500">Operationally inactive</p></div>
+        <div><p className="text-xl font-semibold text-rose-700">{handheld.data.rejectedScans.toLocaleString()}</p><p className="text-xs text-slate-500">Rejected scans</p></div>
+        <div><p className="text-xl font-semibold text-amber-700">{handheld.data.duplicateScans.toLocaleString()}</p><p className="text-xs text-slate-500">Duplicate retries</p></div>
+        <div><p className="text-xl font-semibold text-violet-700">{handheld.data.reversals.toLocaleString()}</p><p className="text-xs text-slate-500">Reversals</p></div>
+        <div><p className="text-xl font-semibold text-rose-700">{handheld.data.damagedPackages.toLocaleString()}</p><p className="text-xs text-slate-500">Damaged packages</p></div>
+        <div><p className="text-xl font-semibold text-amber-700">{handheld.data.misroutedPackages.toLocaleString()}</p><p className="text-xs text-slate-500">Misrouted packages</p></div>
+        <div><p className="text-xl font-semibold text-slate-700">{handheld.data.gpsMissingEvents.toLocaleString()}</p><p className="text-xs text-slate-500">GPS missing</p></div>
+        <div><p className="text-xl font-semibold text-slate-700">{handheld.data.closedContainersNotLoaded.toLocaleString()}</p><p className="text-xs text-slate-500">Closed containers not loaded</p></div>
+      </div>
+    </section>}
     <div className="grid gap-6 xl:grid-cols-[1.3fr_.7fr]">
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="border-b px-6 py-5"><h3 className="font-semibold text-slate-900">Recent activity</h3></div>{events.data?.length ? <div className="divide-y">{events.data.slice(0, 10).map((event, index) => <div key={`${event.reference}-${index}`} className="flex items-center gap-4 px-6 py-4"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-50"><Box className="h-4 w-4 text-slate-500"/></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-slate-800">{event.reference}</p><p className="mt-0.5 text-xs text-slate-400">{time(event.occurredAt)}</p></div><StatusBadge value={event.event}/></div>)}</div> : <EmptyState label="No recent activity matches these filters"/>}</section>
       <section className="rounded-2xl border bg-white p-6 shadow-sm"><h3 className="font-semibold text-slate-900">Package flow</h3><div className="mt-6 space-y-5">{Object.entries(summary.data.packages).map(([statusLabel, value]) => { const max = Math.max(...Object.values(summary.data.packages), 1); return <div key={statusLabel}><div className="mb-2 flex justify-between text-sm"><span className="capitalize text-slate-600">{statusLabel.replace(/([A-Z])/g, ' $1')}</span><span className="font-semibold text-slate-800">{value}</span></div><div className="h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-500" style={{ width: `${value / max * 100}%` }}/></div></div>})}</div></section>

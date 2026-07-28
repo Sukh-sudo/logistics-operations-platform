@@ -71,6 +71,17 @@ export class SnapshotRebuildService {
       where: { packageId: aggregate.id, unloadedAt: null },
       orderBy: { loadedAt: 'desc' },
     });
+    const lastMileEvent = [...aggregate.events]
+      .reverse()
+      .find((event) =>
+        (<PackageEventType[]>[
+          PackageEventType.PACKAGE_LOADED_TO_LAST_MILE,
+          PackageEventType.PACKAGE_REMOVED_FROM_LAST_MILE,
+        ]).includes(event.eventType),
+      );
+    const hasLastMileAssignment =
+      lastMileEvent?.eventType ===
+      PackageEventType.PACKAGE_LOADED_TO_LAST_MILE;
 
     return tx.packageSnapshot.create({
       data: {
@@ -78,11 +89,17 @@ export class SnapshotRebuildService {
         trackingNumber: aggregate.trackingNumber,
         packageType: aggregate.packageType,
         currentStatus: latest
-          ? this.packageStatus(latest.eventType)
+          ? this.packageStatusForEvent(latest.eventType, latest.metadata)
           : PackageStatus.RECEIVED,
         currentTerminalId: this.eventTerminalId(latest?.metadata, latest?.terminalId),
         currentContainerId: activeContainer?.containerId ?? null,
         currentTrailerId: activeTrailer?.trailerId ?? null,
+        currentRouteId: hasLastMileAssignment
+          ? this.metadataString(lastMileEvent?.metadata, 'routeId')
+          : null,
+        currentTruckId: hasLastMileAssignment
+          ? this.metadataString(lastMileEvent?.metadata, 'truckId')
+          : null,
       },
     });
   }
@@ -165,8 +182,35 @@ export class SnapshotRebuildService {
       PACKAGE_ARRIVED: PackageStatus.ARRIVED,
       PACKAGE_OUT_FOR_DELIVERY: PackageStatus.OUT_FOR_DELIVERY,
       PACKAGE_DELIVERED: PackageStatus.DELIVERED,
+      PACKAGE_ATTEMPTED_DELIVERY: PackageStatus.ATTEMPTED_DELIVERY,
+      PACKAGE_DAMAGED: PackageStatus.DAMAGED,
+      PACKAGE_MISROUTED: PackageStatus.MISROUTED,
+      PACKAGE_RETURNED_TO_TERMINAL: PackageStatus.RETURNED_TO_TERMINAL,
+      PACKAGE_LOADED_TO_LAST_MILE: PackageStatus.SORTED,
+      PACKAGE_REMOVED_FROM_LAST_MILE: PackageStatus.SORTED,
     };
     return statuses[eventType];
+  }
+
+  private packageStatusForEvent(
+    eventType: PackageEventType,
+    metadata: Prisma.JsonValue | null,
+  ) {
+    if (
+      (<PackageEventType[]>[
+        PackageEventType.PACKAGE_LOADED_TO_LAST_MILE,
+        PackageEventType.PACKAGE_REMOVED_FROM_LAST_MILE,
+      ]).includes(eventType)
+    ) {
+      const preserved = this.metadataString(metadata, 'currentStatus');
+      if (
+        preserved &&
+        (Object.values(PackageStatus) as string[]).includes(preserved)
+      ) {
+        return preserved as PackageStatus;
+      }
+    }
+    return this.packageStatus(eventType);
   }
 
   private containerStatus(eventType?: ContainerEventType): ContainerStatus {
@@ -204,6 +248,21 @@ export class SnapshotRebuildService {
       typeof metadata === 'object' &&
       !Array.isArray(metadata) &&
       typeof metadata[key] === 'number'
+    ) {
+      return metadata[key];
+    }
+    return null;
+  }
+
+  private metadataString(
+    metadata: Prisma.JsonValue | null | undefined,
+    key: string,
+  ) {
+    if (
+      metadata &&
+      typeof metadata === 'object' &&
+      !Array.isArray(metadata) &&
+      typeof metadata[key] === 'string'
     ) {
       return metadata[key];
     }
