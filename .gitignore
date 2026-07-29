@@ -16,3 +16,12 @@ coverage
 .continue/
 .git.invalid-empty/
 *.bundle
+
+# Local Android toolchain and machine-specific SDK path
+.toolchains/
+apps/handheld-android/local.properties
+
+# Android build outputs
+apps/handheld-android/.gradle/
+apps/handheld-android/build/
+apps/handheld-android/app/build/

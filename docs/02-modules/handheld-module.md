@@ -78,9 +78,24 @@ The browser's network control deliberately simulates connectivity loss.
 Browser local storage stands in for the Android Room database; it is suitable
 for demos but is not presented as secure production device storage.
 
-## Deferred client capabilities
+## Native Android client
 
-The native Android runtime requires a JDK and Android SDK. CameraX/ML Kit,
-Room/WorkManager, Compose screens, encrypted token storage, and device feedback
-remain governed by the Android architecture plan and must not move server
-business rules into the client.
+`apps/handheld-android` is the native Kotlin/Compose client. It implements:
+
+- CameraX/ML Kit barcode capture behind a scanner interface with manual entry.
+- Android Keystore-backed token encryption and terminal bootstrap caching.
+- Room task-session/package snapshots and a persist-before-send event outbox.
+- WorkManager synchronization in device capture order.
+- Trailer, container, last-mile, and courier workflows with session controls.
+- Best-effort courier GPS, network state, scan feedback, package lookup,
+  rejected-event handling, and compensating reversals.
+
+Room is a device read model and delivery queue, not a second logistics source
+of truth. The Android app sends commands to the existing mobile boundary; the
+backend continues to use Prisma transactions to create immutable aggregate and
+task-session events and update their snapshots.
+
+See `apps/handheld-android/README.md` for build setup and the operator
+walkthrough. Enterprise authentication, DataWedge, proof-of-delivery media,
+maps, and MDM deployment remain deferred as documented in the architecture
+plan.

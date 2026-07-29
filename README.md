@@ -38,6 +38,7 @@ The long-term vision is to build a complete logistics platform capable of suppor
 - Integration testing
 - PostgreSQL persistence
 - Prisma ORM
+- Native Android handheld with Compose, Room, WorkManager, and CameraX/ML Kit
 
 ### Scaffolded
 
@@ -363,6 +364,7 @@ apps/
     backend/
     dashboard/
     handheld-simulator/
+    handheld-android/
 
 docs/
 
@@ -377,6 +379,10 @@ to the backend:
 ```bash
 pnpm --filter handheld-simulator dev
 ```
+
+The native client is in `apps/handheld-android`. Its
+[`README`](apps/handheld-android/README.md) documents JDK/Android SDK setup,
+emulator API configuration, build commands, tests, and the operator workflow.
 
 ---
 

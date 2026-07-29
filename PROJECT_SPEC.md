@@ -246,6 +246,7 @@ The current implementation includes:
 - Health
 - Handheld workflow API
 - Browser-based handheld workflow simulator
+- Native Android handheld client
 
 ---
 
@@ -910,6 +911,8 @@ dashboard/
 
 handheld-simulator/
 
+handheld-android/
+
 src/
 
 modules/
@@ -1078,6 +1081,7 @@ Future
 | Health | ✅ Implemented |
 | Handheld workflow API | ✅ Implemented |
 | Handheld simulator | ✅ Implemented |
+| Native Android handheld | ✅ Implemented |
 | Terminal | 📋 Planned |
 | Route | 📋 Planned |
 | Trip | 📋 Planned |

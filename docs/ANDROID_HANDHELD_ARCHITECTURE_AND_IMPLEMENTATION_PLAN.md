@@ -1,12 +1,14 @@
 # Android Handheld Architecture and Implementation Plan
 
-> Implementation status (July 28, 2026): the backend mobile workflow boundary,
+> Implementation status (July 29, 2026): the backend mobile workflow boundary,
 > task-session event/snapshot models, transactional idempotency receipts,
 > ordered synchronization contract, GPS flags, reversals, snapshot lookups, and
-> supervisor reporting APIs, and the React handheld workflow simulator are
-> implemented. The native Android application remains a separate client
-> deliverable; see `docs/02-modules/handheld-module.md` for the implemented
-> server and simulator boundaries.
+> supervisor reporting APIs, React handheld workflow simulator, and native
+> Kotlin/Compose Android client are implemented. The Android client uses Room,
+> WorkManager, CameraX/ML Kit, Android Keystore storage, device feedback, and
+> best-effort GPS while leaving authoritative business decisions on the server.
+> See `docs/02-modules/handheld-module.md` and
+> `apps/handheld-android/README.md` for implementation and setup details.
 
 ## 1. Document purpose
 
@@ -25,14 +27,14 @@ The platform is a monorepo with these relevant components:
 - `apps/backend`: NestJS API using Prisma and PostgreSQL.
 - `apps/frontend`: React desktop-first internal operations dashboard.
 - `apps/handheld-simulator`: Event and handheld behaviour simulator.
-- `apps/handheld-android`: New native Android application to be created by this plan.
+- `apps/handheld-android`: Native Kotlin/Compose Android application.
 
 The implemented simulator is a responsive React/Vite client of the same mobile
 API. It provides the task UI, persistent local outbox, ordered synchronization,
 best-effort browser GPS, scan feedback, and online/offline demo controls. It
-validates the client workflow and contract, but it does not satisfy the native
-Android requirements for Room, WorkManager, CameraX/ML Kit, Android Keystore,
-or Compose.
+validates the client workflow and contract. The native Android application
+implements the device-specific Room, WorkManager, CameraX/ML Kit, Android
+Keystore, Compose, feedback, and GPS requirements.
 
 Existing backend capabilities include:
 

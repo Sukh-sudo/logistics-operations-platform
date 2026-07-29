@@ -1,0 +1,396 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "044e89b7bc731ede3745d95b7ad87546",
+    "entities": [
+      {
+        "tableName": "bootstrap_cache",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `employeeId` TEXT NOT NULL, `employeeNumber` TEXT NOT NULL, `firstName` TEXT NOT NULL, `lastName` TEXT NOT NULL, `roles` TEXT NOT NULL, `terminalId` INTEGER NOT NULL, `terminalCode` TEXT NOT NULL, `terminalName` TEXT NOT NULL, `authorizedTasks` TEXT NOT NULL, `inactivityMinutes` INTEGER NOT NULL, `gpsLowAccuracyThresholdMetres` REAL NOT NULL, `localHistoryRetentionHours` INTEGER NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "employeeId",
+            "columnName": "employeeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "employeeNumber",
+            "columnName": "employeeNumber",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstName",
+            "columnName": "firstName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastName",
+            "columnName": "lastName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "roles",
+            "columnName": "roles",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "terminalId",
+            "columnName": "terminalId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "terminalCode",
+            "columnName": "terminalCode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "terminalName",
+            "columnName": "terminalName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "authorizedTasks",
+            "columnName": "authorizedTasks",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "inactivityMinutes",
+            "columnName": "inactivityMinutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gpsLowAccuracyThresholdMetres",
+            "columnName": "gpsLowAccuracyThresholdMetres",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localHistoryRetentionHours",
+            "columnName": "localHistoryRetentionHours",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "task_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`serverSessionId` TEXT NOT NULL, `employeeId` TEXT NOT NULL, `terminalId` INTEGER NOT NULL, `deviceId` TEXT NOT NULL, `taskType` TEXT NOT NULL, `startedAt` TEXT NOT NULL, `lastAcceptedActivityAt` TEXT, `activityState` TEXT NOT NULL, `networkState` TEXT NOT NULL, `selectedTrailerBarcode` TEXT, `selectedRouteCode` TEXT, `selectedTruckUnitNumber` TEXT, PRIMARY KEY(`serverSessionId`))",
+        "fields": [
+          {
+            "fieldPath": "serverSessionId",
+            "columnName": "serverSessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "employeeId",
+            "columnName": "employeeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "terminalId",
+            "columnName": "terminalId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceId",
+            "columnName": "deviceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "taskType",
+            "columnName": "taskType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastAcceptedActivityAt",
+            "columnName": "lastAcceptedActivityAt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "activityState",
+            "columnName": "activityState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "networkState",
+            "columnName": "networkState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectedTrailerBarcode",
+            "columnName": "selectedTrailerBarcode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "selectedRouteCode",
+            "columnName": "selectedRouteCode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "selectedTruckUnitNumber",
+            "columnName": "selectedTruckUnitNumber",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "serverSessionId"
+          ]
+        }
+      },
+      {
+        "tableName": "outbox_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`clientEventId` TEXT NOT NULL, `receiptId` TEXT, `serverEventId` TEXT, `originalClientEventId` TEXT, `originalReceiptId` TEXT, `taskSessionId` TEXT NOT NULL, `action` TEXT NOT NULL, `trackingNumber` TEXT, `containerBarcode` TEXT, `trailerBarcode` TEXT, `routeCode` TEXT, `truckUnitNumber` TEXT, `deviceId` TEXT NOT NULL, `deviceTimestamp` TEXT NOT NULL, `serverReceivedAt` TEXT, `latitude` REAL, `longitude` REAL, `gpsAccuracyMetres` REAL, `gpsCapturedAt` TEXT, `networkStateAtCapture` TEXT NOT NULL, `syncState` TEXT NOT NULL, `code` TEXT, `message` TEXT NOT NULL, `exceptionFlags` TEXT NOT NULL, `retryCount` INTEGER NOT NULL, `createdAt` TEXT NOT NULL, `resolvedAt` TEXT, PRIMARY KEY(`clientEventId`))",
+        "fields": [
+          {
+            "fieldPath": "clientEventId",
+            "columnName": "clientEventId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receiptId",
+            "columnName": "receiptId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "serverEventId",
+            "columnName": "serverEventId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalClientEventId",
+            "columnName": "originalClientEventId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalReceiptId",
+            "columnName": "originalReceiptId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "taskSessionId",
+            "columnName": "taskSessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trackingNumber",
+            "columnName": "trackingNumber",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "containerBarcode",
+            "columnName": "containerBarcode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "trailerBarcode",
+            "columnName": "trailerBarcode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "routeCode",
+            "columnName": "routeCode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "truckUnitNumber",
+            "columnName": "truckUnitNumber",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "deviceId",
+            "columnName": "deviceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceTimestamp",
+            "columnName": "deviceTimestamp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "serverReceivedAt",
+            "columnName": "serverReceivedAt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "gpsAccuracyMetres",
+            "columnName": "gpsAccuracyMetres",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "gpsCapturedAt",
+            "columnName": "gpsCapturedAt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "networkStateAtCapture",
+            "columnName": "networkStateAtCapture",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncState",
+            "columnName": "syncState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "message",
+            "columnName": "message",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exceptionFlags",
+            "columnName": "exceptionFlags",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "retryCount",
+            "columnName": "retryCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resolvedAt",
+            "columnName": "resolvedAt",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "clientEventId"
+          ]
+        }
+      },
+      {
+        "tableName": "package_cache",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`trackingNumber` TEXT NOT NULL, `postalCode` TEXT, `routeCode` TEXT, `currentStatus` TEXT, `containerBarcode` TEXT, `trailerBarcode` TEXT, `cacheUpdatedAt` TEXT NOT NULL, PRIMARY KEY(`trackingNumber`))",
+        "fields": [
+          {
+            "fieldPath": "trackingNumber",
+            "columnName": "trackingNumber",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "postalCode",
+            "columnName": "postalCode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "routeCode",
+            "columnName": "routeCode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "currentStatus",
+            "columnName": "currentStatus",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "containerBarcode",
+            "columnName": "containerBarcode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "trailerBarcode",
+            "columnName": "trailerBarcode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cacheUpdatedAt",
+            "columnName": "cacheUpdatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "trackingNumber"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '044e89b7bc731ede3745d95b7ad87546')"
+    ]
+  }
+}
