@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Box,
   CheckCircle2,
   CirclePause,
@@ -26,6 +27,7 @@ interface WorkScreenProps {
   recentEvents: OutboxEvent[];
   busy: boolean;
   online: boolean;
+  onBack: () => void;
   onContextChange: (context: OperationalContext) => void;
   onCapture: (
     action: HandheldAction,
@@ -42,6 +44,7 @@ export function WorkScreen({
   recentEvents,
   busy,
   online,
+  onBack,
   onContextChange,
   onCapture,
   onTransition,
@@ -84,6 +87,11 @@ export function WorkScreen({
 
   return (
     <div className="screen-content work-screen">
+      <button className="work-back-button" type="button" onClick={onBack}>
+        <ArrowLeft />
+        <span>Main menu</span>
+      </button>
+
       <section className="work-header">
         <div>
           <p className="eyebrow">ACTIVE TASK</p>

@@ -268,6 +268,16 @@ input::placeholder { color: #99a49e; }
   border-radius: 999px; color: var(--green-950); background: var(--lime); font-size: 8px; font-style: normal;
 }
 
+.work-back-button {
+  margin: -5px 0 14px -7px;
+  padding: 7px;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; border-radius: 9px;
+  color: var(--green-800); background: transparent;
+  font-size: 10px; font-weight: 800;
+}
+.work-back-button:hover { background: #e7efe9; }
+.work-back-button svg { width: 17px; height: 17px; }
 .work-header { display: flex; justify-content: space-between; align-items: center; }
 .work-header h2 { margin-top: 3px; font-size: 23px; letter-spacing: -.03em; }
 .work-header > div > p:last-child { margin-top: 4px; color: var(--muted); font-size: 10px; }

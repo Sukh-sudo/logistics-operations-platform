@@ -77,6 +77,9 @@ describe('handheld simulator workflow', () => {
     expect(await screen.findByText(/good shift, alex/i)).toBeTruthy();
 
     await user.click(screen.getByText(/^Load trailer$/).closest('button')!);
+    await user.click(await screen.findByRole('button', { name: /main menu/i }));
+    expect(await screen.findByText(/good shift, alex/i)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /current task/i }));
     await user.type(await screen.findByLabelText(/trailer barcode/i), 'TRL-1002');
     await user.type(screen.getByLabelText(/package tracking number/i), 'PKG-100');
     await user.click(screen.getByRole('button', { name: /record scan/i }));

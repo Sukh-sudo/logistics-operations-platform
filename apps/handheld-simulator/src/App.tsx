@@ -417,6 +417,7 @@ export function App() {
               recentEvents={sessionEvents}
               busy={busy}
               online={online}
+              onBack={() => setView('home')}
               onContextChange={updateContext}
               onCapture={capture}
               onTransition={transitionSession}
