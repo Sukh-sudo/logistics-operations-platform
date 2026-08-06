@@ -6,7 +6,15 @@ export interface DashboardSummaryDto {
 export interface RecentEventDto { assetType: 'PACKAGE' | 'CONTAINER' | 'TRAILER'; reference: string; event: string; occurredAt: string; }
 export interface DashboardTrailerDto { trailerBarcode: string; status: string; containerCount: number; packageCount: number; }
 export interface DashboardContainerDto { containerBarcode: string; status: string; packageCount: number; assignedTrailer: string | null; }
-export interface DashboardPackageDto { trackingNumber: string; status: string; containerBarcode: string | null; trailerBarcode: string | null; }
+export interface DashboardPackageDto {
+  trackingNumber: string;
+  status: string;
+  containerBarcode: string | null;
+  trailerBarcode: string | null;
+  updatedAt: string;
+  originTerminalId: number | null;
+  destinationTerminalId: number | null;
+}
 export interface DashboardTerminalOptionDto { id: number; terminalCode: string; name: string; city: string; }
 export interface HandheldKpiDto {
   acceptedPackages: number;

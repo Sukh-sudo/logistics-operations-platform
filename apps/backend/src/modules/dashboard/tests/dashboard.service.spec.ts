@@ -5,9 +5,9 @@ import { DashboardService } from '../services/dashboard.service';
 
 describe('DashboardService filters', () => {
   const prisma = {
-    packageSnapshot: { count: jest.fn() },
-    containerSnapshot: { count: jest.fn() },
-    trailerSnapshot: { count: jest.fn() },
+    packageSnapshot: { count: jest.fn(), findMany: jest.fn() },
+    containerSnapshot: { count: jest.fn(), findMany: jest.fn() },
+    trailerSnapshot: { count: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() },
     packageEvent: { findMany: jest.fn() },
     containerEvent: { findMany: jest.fn() },
     trailerEvent: { findMany: jest.fn() },
@@ -25,6 +25,10 @@ describe('DashboardService filters', () => {
     prisma.packageSnapshot.count.mockResolvedValue(1);
     prisma.containerSnapshot.count.mockResolvedValue(1);
     prisma.trailerSnapshot.count.mockResolvedValue(1);
+    prisma.packageSnapshot.findMany.mockResolvedValue([]);
+    prisma.containerSnapshot.findMany.mockResolvedValue([]);
+    prisma.trailerSnapshot.findMany.mockResolvedValue([]);
+    prisma.trailerSnapshot.findUnique.mockResolvedValue(null);
     prisma.packageEvent.findMany.mockResolvedValue([]);
     prisma.containerEvent.findMany.mockResolvedValue([]);
     prisma.trailerEvent.findMany.mockResolvedValue([]);
@@ -108,6 +112,63 @@ describe('DashboardService filters', () => {
     await expect(service.getSummary({ fromDate: '2026-07-03', toDate: '2026-07-02' }))
       .rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.packageSnapshot.count).not.toHaveBeenCalled();
+  });
+
+  it('combines package date, lane, and status filters', async () => {
+    await service.getPackages({
+      fromDate: '2026-07-01',
+      toDate: '2026-07-02',
+      originTerminalId: 1,
+      destinationTerminalId: 2,
+      status: PackageStatus.IN_TRAILER,
+    });
+
+    expect(prisma.packageSnapshot.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        updatedAt: {
+          gte: new Date('2026-07-01T00:00:00.000Z'),
+          lt: new Date('2026-07-03T00:00:00.000Z'),
+        },
+        currentStatus: PackageStatus.IN_TRAILER,
+        aggregate: {
+          shipmentPackages: {
+            some: { shipment: { originTerminalId: 1, destinationTerminalId: 2 } },
+          },
+        },
+      },
+    }));
+  });
+
+  it('returns package snapshot dates and shipment lanes', async () => {
+    prisma.packageSnapshot.findMany.mockResolvedValue([{
+      trackingNumber: 'PKG000000001',
+      currentStatus: PackageStatus.IN_CONTAINER,
+      currentContainerId: 'container-1',
+      currentTrailerId: null,
+      updatedAt: new Date('2026-07-10T12:00:00.000Z'),
+      aggregate: {
+        shipmentPackages: [{ shipment: { originTerminalId: 1, destinationTerminalId: 2 } }],
+      },
+    }]);
+    prisma.containerSnapshot.findMany.mockResolvedValue([{
+      id: 'container-1',
+      containerBarcode: 'CONT000001',
+      currentTrailerId: 'trailer-1',
+    }]);
+    prisma.trailerSnapshot.findMany.mockResolvedValue([{
+      id: 'trailer-1',
+      trailerBarcode: 'TRLR000001',
+    }]);
+
+    await expect(service.getPackages()).resolves.toEqual([{
+      trackingNumber: 'PKG000000001',
+      status: PackageStatus.IN_CONTAINER,
+      containerBarcode: 'CONT000001',
+      trailerBarcode: 'TRLR000001',
+      updatedAt: '2026-07-10T12:00:00.000Z',
+      originTerminalId: 1,
+      destinationTerminalId: 2,
+    }]);
   });
 
   it('calculates terminal PPH from accepted scans and aggregate active time', async () => {

@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { DashboardQueryDto } from '../dto/dashboard-query.dto';
 import { HandheldDashboardQueryDto } from '../dto/handheld-dashboard-query.dto';
+import { PackageListQueryDto } from '../dto/package-list-query.dto';
 
 @Injectable()
 export class DashboardService {
@@ -595,81 +596,79 @@ private getInclusiveDateRange(
   return range;
 }
 
-// Returns all packages with their current operational location
-async getPackages() {
-  const packages =
-    await this.prisma.packageSnapshot.findMany({
-      orderBy: {
-        trackingNumber: 'asc',
-      },
-    });
-
-  return Promise.all(
-    packages.map(async (pkg) => {
-      let containerBarcode: string | null = null;
-      let trailerBarcode: string | null = null;
-
-      // Resolve the container barcode
-      if (pkg.currentContainerId) {
-        const container =
-          await this.prisma.containerSnapshot.findUnique({
-            where: {
-              id: pkg.currentContainerId,
-            },
-            select: {
-              containerBarcode: true,
-              currentTrailerId: true,
-            },
-          });
-
-        if (container) {
-          containerBarcode = container.containerBarcode;
-
-          // Resolve the trailer through the container
-          if (container.currentTrailerId) {
-            const trailer =
-              await this.prisma.trailerSnapshot.findUnique({
-                where: {
-                  id: container.currentTrailerId,
-                },
-                select: {
-                  trailerBarcode: true,
-                },
-              });
-
-            trailerBarcode =
-              trailer?.trailerBarcode ?? null;
-          }
-        }
-      }
-
-      // Package loaded directly onto trailer
-      if (
-        !trailerBarcode &&
-        pkg.currentTrailerId
-      ) {
-        const trailer =
-          await this.prisma.trailerSnapshot.findUnique({
-            where: {
-              id: pkg.currentTrailerId,
-            },
-            select: {
-              trailerBarcode: true,
-            },
-          });
-
-        trailerBarcode =
-          trailer?.trailerBarcode ?? null;
-      }
-
-      return {
-        trackingNumber: pkg.trackingNumber,
-        status: pkg.currentStatus,
-        containerBarcode,
-        trailerBarcode,
-      };
+// Returns packages with their current operational location and shipment lane.
+async getPackages(filters: PackageListQueryDto = {}) {
+  const snapshotDate = this.getInclusiveDateRange(filters);
+  const lane = {
+    ...(filters.originTerminalId !== undefined && {
+      originTerminalId: filters.originTerminalId,
     }),
-  );
+    ...(filters.destinationTerminalId !== undefined && {
+      destinationTerminalId: filters.destinationTerminalId,
+    }),
+  };
+  const hasLaneFilter = Object.keys(lane).length > 0;
+  const packages = await this.prisma.packageSnapshot.findMany({
+    where: {
+      ...(snapshotDate && { updatedAt: snapshotDate }),
+      ...(filters.status && { currentStatus: filters.status }),
+      ...(hasLaneFilter && {
+        aggregate: {
+          shipmentPackages: { some: { shipment: lane } },
+        },
+      }),
+    },
+    include: {
+      aggregate: {
+        select: {
+          shipmentPackages: {
+            take: 1,
+            select: {
+              shipment: {
+                select: { originTerminalId: true, destinationTerminalId: true },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { trackingNumber: 'asc' },
+  });
+
+  const containerIds = packages.flatMap((pkg) => pkg.currentContainerId ? [pkg.currentContainerId] : []);
+  const containers = containerIds.length
+    ? await this.prisma.containerSnapshot.findMany({
+        where: { id: { in: containerIds } },
+        select: { id: true, containerBarcode: true, currentTrailerId: true },
+      })
+    : [];
+  const containerById = new Map(containers.map((container) => [container.id, container]));
+  const trailerIds = new Set(packages.flatMap((pkg) => pkg.currentTrailerId ? [pkg.currentTrailerId] : []));
+  containers.forEach((container) => {
+    if (container.currentTrailerId) trailerIds.add(container.currentTrailerId);
+  });
+  const trailers = trailerIds.size
+    ? await this.prisma.trailerSnapshot.findMany({
+        where: { id: { in: [...trailerIds] } },
+        select: { id: true, trailerBarcode: true },
+      })
+    : [];
+  const trailerById = new Map(trailers.map((trailer) => [trailer.id, trailer.trailerBarcode]));
+
+  return packages.map((pkg) => {
+    const container = pkg.currentContainerId ? containerById.get(pkg.currentContainerId) : undefined;
+    const trailerId = pkg.currentTrailerId ?? container?.currentTrailerId ?? null;
+    const shipment = pkg.aggregate.shipmentPackages[0]?.shipment;
+    return {
+      trackingNumber: pkg.trackingNumber,
+      status: pkg.currentStatus,
+      containerBarcode: container?.containerBarcode ?? null,
+      trailerBarcode: trailerId ? trailerById.get(trailerId) ?? null : null,
+      updatedAt: pkg.updatedAt.toISOString(),
+      originTerminalId: shipment?.originTerminalId ?? null,
+      destinationTerminalId: shipment?.destinationTerminalId ?? null,
+    };
+  });
 }
 
 }

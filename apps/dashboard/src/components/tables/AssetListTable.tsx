@@ -21,6 +21,7 @@ interface AssetListTableProps<T> {
   searchableValues: (asset: T) => Array<string | null | undefined>;
   emptyLabel: string;
   errorLabel: string;
+  filters?: ReactNode;
 }
 
 /** Shared snapshot-list presentation keeps all three operational asset pages consistent. */
@@ -37,6 +38,7 @@ export function AssetListTable<T>({
   searchableValues,
   emptyLabel,
   errorLabel,
+  filters,
 }: AssetListTableProps<T>) {
   const [query, setQuery] = useState('');
   const visibleAssets = useMemo(
@@ -50,6 +52,8 @@ export function AssetListTable<T>({
       <h2 className="mt-1 text-2xl font-semibold text-slate-900">{title}</h2>
       <p className="mt-2 text-slate-500">{description}</p>
     </div>
+
+    {filters}
 
     <label className="relative block max-w-lg">
       <span className="sr-only">{searchLabel}</span>

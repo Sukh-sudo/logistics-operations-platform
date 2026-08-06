@@ -3,6 +3,7 @@ import {ApiOkResponse, ApiOperation, ApiTags,} from '@nestjs/swagger';
 import { DashboardQueryDto } from '../dto/dashboard-query.dto';
 import { DashboardService } from '../services/dashboard.service';
 import { HandheldDashboardQueryDto } from '../dto/handheld-dashboard-query.dto';
+import { PackageListQueryDto } from '../dto/package-list-query.dto';
 
 @ApiTags('Dashboard')
 @Controller('dashboard')
@@ -73,8 +74,8 @@ getContainers() {
   description: 'Returns package operational information.',
 })
 @Get('packages')
-getPackages() {
-  return this.dashboardService.getPackages();
+getPackages(@Query() query: PackageListQueryDto) {
+  return this.dashboardService.getPackages(query);
 }
 
 @ApiOperation({

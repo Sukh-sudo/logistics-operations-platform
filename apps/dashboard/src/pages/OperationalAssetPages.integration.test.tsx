@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,6 +13,7 @@ vi.mock('../services/dashboard.api', () => ({
     packages: vi.fn(),
     containers: vi.fn(),
     trailers: vi.fn(),
+    terminals: vi.fn(),
   },
 }));
 
@@ -27,8 +28,8 @@ const renderPage = (page: React.ReactNode) => render(
 describe('operational asset list pages', () => {
   beforeEach(() => {
     vi.mocked(dashboardApi.packages).mockResolvedValue([
-      { trackingNumber: 'PKG000000001', status: 'IN_CONTAINER', containerBarcode: 'CONT000001', trailerBarcode: 'TRLR000001' },
-      { trackingNumber: 'PKG000000002', status: 'DELIVERED', containerBarcode: null, trailerBarcode: null },
+      { trackingNumber: 'PKG000000001', status: 'IN_CONTAINER', containerBarcode: 'CONT000001', trailerBarcode: 'TRLR000001', updatedAt: '2026-07-10T12:00:00.000Z', originTerminalId: 1, destinationTerminalId: 2 },
+      { trackingNumber: 'PKG000000002', status: 'DELIVERED', containerBarcode: null, trailerBarcode: null, updatedAt: '2026-07-11T12:00:00.000Z', originTerminalId: 2, destinationTerminalId: 1 },
     ]);
     vi.mocked(dashboardApi.containers).mockResolvedValue([
       { containerBarcode: 'CONT000001', status: 'OPEN', packageCount: 4, assignedTrailer: 'TRLR000001' },
@@ -36,6 +37,33 @@ describe('operational asset list pages', () => {
     vi.mocked(dashboardApi.trailers).mockResolvedValue([
       { trailerBarcode: 'TRLR000001', status: 'IN_TRANSIT', containerCount: 2, packageCount: 11 },
     ]);
+    vi.mocked(dashboardApi.terminals).mockResolvedValue([
+      { id: 1, terminalCode: 'CAL', name: 'Calgary-000', city: 'Calgary' },
+      { id: 2, terminalCode: 'EDM', name: 'Edmonton-000', city: 'Edmonton' },
+    ]);
+  });
+
+  it('sends date, lane, and status package filters to the API', async () => {
+    const user = userEvent.setup();
+    renderPage(<PackageListPage/>);
+    await screen.findByRole('link', { name: 'PKG000000001' });
+
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-07-01' } });
+    fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-07-31' } });
+    await user.selectOptions(screen.getByLabelText('Origin terminal'), '1');
+    await user.selectOptions(screen.getByLabelText('Destination terminal'), '2');
+    await user.selectOptions(screen.getByLabelText('Package status'), 'IN_TRAILER');
+
+    await waitFor(() => expect(dashboardApi.packages).toHaveBeenLastCalledWith({
+      fromDate: '2026-07-01',
+      toDate: '2026-07-31',
+      originTerminalId: 1,
+      destinationTerminalId: 2,
+      status: 'IN_TRAILER',
+    }));
+
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    await waitFor(() => expect(dashboardApi.packages).toHaveBeenLastCalledWith({}));
   });
 
   it('loads package snapshots and filters the visible rows', async () => {
