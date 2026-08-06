@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { PackageStatus, TrailerStatus } from '@prisma/client';
+import { ContainerStatus, PackageStatus, TrailerStatus } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { DashboardService } from '../services/dashboard.service';
 
@@ -169,6 +169,83 @@ describe('DashboardService filters', () => {
       originTerminalId: 1,
       destinationTerminalId: 2,
     }]);
+  });
+
+  it('filters containers by snapshot date, package lane, and status', async () => {
+    prisma.packageSnapshot.findMany.mockResolvedValue([{ currentContainerId: 'container-1' }]);
+    prisma.containerSnapshot.findMany.mockResolvedValue([]);
+
+    await service.getContainers({
+      fromDate: '2026-07-01',
+      toDate: '2026-07-02',
+      originTerminalId: 1,
+      destinationTerminalId: 2,
+      status: ContainerStatus.CLOSED,
+    });
+
+    expect(prisma.packageSnapshot.findMany).toHaveBeenCalledWith({
+      where: {
+        currentContainerId: { not: null },
+        aggregate: {
+          shipmentPackages: {
+            some: { shipment: { originTerminalId: 1, destinationTerminalId: 2 } },
+          },
+        },
+      },
+      select: { currentContainerId: true },
+      distinct: ['currentContainerId'],
+    });
+    expect(prisma.containerSnapshot.findMany).toHaveBeenLastCalledWith({
+      where: {
+        updatedAt: {
+          gte: new Date('2026-07-01T00:00:00.000Z'),
+          lt: new Date('2026-07-03T00:00:00.000Z'),
+        },
+        currentStatus: ContainerStatus.CLOSED,
+        id: { in: ['container-1'] },
+      },
+      orderBy: { containerBarcode: 'asc' },
+    });
+  });
+
+  it('filters trailers by snapshot date, package lane, and status', async () => {
+    prisma.packageSnapshot.findMany.mockResolvedValue([{
+      currentTrailerId: null,
+      currentContainerId: 'container-1',
+    }]);
+    prisma.containerSnapshot.findMany.mockResolvedValue([{ currentTrailerId: 'trailer-1' }]);
+    prisma.trailerSnapshot.findMany.mockResolvedValue([]);
+
+    await service.getTrailers({
+      fromDate: '2026-07-01',
+      toDate: '2026-07-02',
+      originTerminalId: 1,
+      destinationTerminalId: 2,
+      status: TrailerStatus.IN_TRANSIT,
+    });
+
+    expect(prisma.packageSnapshot.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [{ currentTrailerId: { not: null } }, { currentContainerId: { not: null } }],
+        aggregate: {
+          shipmentPackages: {
+            some: { shipment: { originTerminalId: 1, destinationTerminalId: 2 } },
+          },
+        },
+      },
+      select: { currentTrailerId: true, currentContainerId: true },
+    });
+    expect(prisma.trailerSnapshot.findMany).toHaveBeenCalledWith({
+      where: {
+        updatedAt: {
+          gte: new Date('2026-07-01T00:00:00.000Z'),
+          lt: new Date('2026-07-03T00:00:00.000Z'),
+        },
+        currentStatus: TrailerStatus.IN_TRANSIT,
+        id: { in: ['trailer-1'] },
+      },
+      orderBy: { trailerBarcode: 'asc' },
+    });
   });
 
   it('calculates terminal PPH from accepted scans and aggregate active time', async () => {

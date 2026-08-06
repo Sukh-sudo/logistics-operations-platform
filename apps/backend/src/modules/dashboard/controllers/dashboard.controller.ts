@@ -4,6 +4,8 @@ import { DashboardQueryDto } from '../dto/dashboard-query.dto';
 import { DashboardService } from '../services/dashboard.service';
 import { HandheldDashboardQueryDto } from '../dto/handheld-dashboard-query.dto';
 import { PackageListQueryDto } from '../dto/package-list-query.dto';
+import { ContainerListQueryDto } from '../dto/container-list-query.dto';
+import { TrailerListQueryDto } from '../dto/trailer-list-query.dto';
 
 @ApiTags('Dashboard')
 @Controller('dashboard')
@@ -50,8 +52,8 @@ getSummary(@Query() query: DashboardQueryDto) {
   description: 'Returns trailer operational information.',
 })
 @Get('trailers')
-getTrailers() {
-  return this.dashboardService.getTrailers();
+getTrailers(@Query() query: TrailerListQueryDto) {
+  return this.dashboardService.getTrailers(query);
 }
 
 // Returns all container summaries for the dashboard
@@ -62,8 +64,8 @@ getTrailers() {
   description: 'Returns container operational information.',
 })
 @Get('containers')
-getContainers() {
-  return this.dashboardService.getContainers();
+getContainers(@Query() query: ContainerListQueryDto) {
+  return this.dashboardService.getContainers(query);
 }
 
 // Returns all package locations for the dashboard

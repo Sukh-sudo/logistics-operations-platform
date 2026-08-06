@@ -87,6 +87,26 @@ describe('operational asset list pages', () => {
     expect(dashboardApi.containers).toHaveBeenCalledOnce();
   });
 
+  it('sends date, lane, and status container filters to the API', async () => {
+    const user = userEvent.setup();
+    renderPage(<ContainerListPage/>);
+    await screen.findByRole('link', { name: 'CONT000001' });
+
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-07-01' } });
+    fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-07-31' } });
+    await user.selectOptions(screen.getByLabelText('Origin terminal'), '1');
+    await user.selectOptions(screen.getByLabelText('Destination terminal'), '2');
+    await user.selectOptions(screen.getByLabelText('Container status'), 'CLOSED');
+
+    await waitFor(() => expect(dashboardApi.containers).toHaveBeenLastCalledWith({
+      fromDate: '2026-07-01',
+      toDate: '2026-07-31',
+      originTerminalId: 1,
+      destinationTerminalId: 2,
+      status: 'CLOSED',
+    }));
+  });
+
   it('loads trailer snapshots with current freight totals', async () => {
     renderPage(<TrailerListPage/>);
 
@@ -94,5 +114,25 @@ describe('operational asset list pages', () => {
     expect(screen.getByText('2')).toBeTruthy();
     expect(screen.getByText('11')).toBeTruthy();
     expect(dashboardApi.trailers).toHaveBeenCalledOnce();
+  });
+
+  it('sends date, lane, and status trailer filters to the API', async () => {
+    const user = userEvent.setup();
+    renderPage(<TrailerListPage/>);
+    await screen.findByRole('link', { name: 'TRLR000001' });
+
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-07-01' } });
+    fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-07-31' } });
+    await user.selectOptions(screen.getByLabelText('Origin terminal'), '1');
+    await user.selectOptions(screen.getByLabelText('Destination terminal'), '2');
+    await user.selectOptions(screen.getByLabelText('Trailer status'), 'IN_TRANSIT');
+
+    await waitFor(() => expect(dashboardApi.trailers).toHaveBeenLastCalledWith({
+      fromDate: '2026-07-01',
+      toDate: '2026-07-31',
+      originTerminalId: 1,
+      destinationTerminalId: 2,
+      status: 'IN_TRANSIT',
+    }));
   });
 });

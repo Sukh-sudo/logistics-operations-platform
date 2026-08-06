@@ -10,6 +10,8 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { DashboardQueryDto } from '../dto/dashboard-query.dto';
 import { HandheldDashboardQueryDto } from '../dto/handheld-dashboard-query.dto';
 import { PackageListQueryDto } from '../dto/package-list-query.dto';
+import { ContainerListQueryDto } from '../dto/container-list-query.dto';
+import { TrailerListQueryDto } from '../dto/trailer-list-query.dto';
 
 @Injectable()
 export class DashboardService {
@@ -348,9 +350,37 @@ export class DashboardService {
     };
   }
 
-  async getTrailers() {
+  async getTrailers(filters: TrailerListQueryDto = {}) {
+  const snapshotDate = this.getInclusiveDateRange(filters);
+  const lane = this.shipmentLane(filters);
+  let laneTrailerIds: string[] | undefined;
+  if (lane) {
+    const lanePackages = await this.prisma.packageSnapshot.findMany({
+      where: {
+        OR: [{ currentTrailerId: { not: null } }, { currentContainerId: { not: null } }],
+        aggregate: { shipmentPackages: { some: { shipment: lane } } },
+      },
+      select: { currentTrailerId: true, currentContainerId: true },
+    });
+    const currentContainerIds = lanePackages.flatMap((pkg) => pkg.currentContainerId ? [pkg.currentContainerId] : []);
+    const containerLocations = currentContainerIds.length
+      ? await this.prisma.containerSnapshot.findMany({
+          where: { id: { in: currentContainerIds }, currentTrailerId: { not: null } },
+          select: { currentTrailerId: true },
+        })
+      : [];
+    laneTrailerIds = [...new Set([
+      ...lanePackages.flatMap((pkg) => pkg.currentTrailerId ? [pkg.currentTrailerId] : []),
+      ...containerLocations.flatMap((container) => container.currentTrailerId ? [container.currentTrailerId] : []),
+    ])];
+  }
   const trailers =
     await this.prisma.trailerSnapshot.findMany({
+      where: {
+        ...(snapshotDate && { updatedAt: snapshotDate }),
+        ...(filters.status && { currentStatus: filters.status }),
+        ...(laneTrailerIds && { id: { in: laneTrailerIds } }),
+      },
       orderBy: {
         trailerBarcode: 'asc',
       },
@@ -407,10 +437,27 @@ export class DashboardService {
 }
 
 // Returns all containers for the operations dashboard
-async getContainers() {
+async getContainers(filters: ContainerListQueryDto = {}) {
+  const snapshotDate = this.getInclusiveDateRange(filters);
+  const lane = this.shipmentLane(filters);
+  const laneContainerIds = lane
+    ? (await this.prisma.packageSnapshot.findMany({
+        where: {
+          currentContainerId: { not: null },
+          aggregate: { shipmentPackages: { some: { shipment: lane } } },
+        },
+        select: { currentContainerId: true },
+        distinct: ['currentContainerId'],
+      })).flatMap((pkg) => pkg.currentContainerId ? [pkg.currentContainerId] : [])
+    : undefined;
   // Fetch all container snapshots
   const containers =
     await this.prisma.containerSnapshot.findMany({
+      where: {
+        ...(snapshotDate && { updatedAt: snapshotDate }),
+        ...(filters.status && { currentStatus: filters.status }),
+        ...(laneContainerIds && { id: { in: laneContainerIds } }),
+      },
       orderBy: {
         containerBarcode: 'asc',
       },
@@ -594,6 +641,14 @@ private getInclusiveDateRange(
     range.lt = exclusiveEnd;
   }
   return range;
+}
+
+private shipmentLane(filters: { originTerminalId?: number; destinationTerminalId?: number }) {
+  if (filters.originTerminalId === undefined && filters.destinationTerminalId === undefined) return undefined;
+  return {
+    ...(filters.originTerminalId !== undefined && { originTerminalId: filters.originTerminalId }),
+    ...(filters.destinationTerminalId !== undefined && { destinationTerminalId: filters.destinationTerminalId }),
+  };
 }
 
 // Returns packages with their current operational location and shipment lane.
