@@ -19,6 +19,11 @@ import type {
   SessionState,
   WorkSession,
 } from '../domain/types';
+import {
+  type ScanField,
+  type ScanValidationErrors,
+  validateScanInput,
+} from '../domain/scanValidation';
 import { taskDefinition } from '../domain/workflows';
 
 interface WorkScreenProps {
@@ -54,6 +59,7 @@ export function WorkScreen({
   const [identifier, setIdentifier] = useState('');
   const [containerBarcode, setContainerBarcode] = useState('');
   const [captureGps, setCaptureGps] = useState(true);
+  const [validationErrors, setValidationErrors] = useState<ScanValidationErrors>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const definition = useMemo(
     () => task.actions.find((candidate) => candidate.value === selectedAction)!,
@@ -63,11 +69,33 @@ export function WorkScreen({
   useEffect(() => {
     setIdentifier('');
     setContainerBarcode('');
+    setValidationErrors({});
     inputRef.current?.focus();
   }, [selectedAction]);
 
+  const clearValidationError = (field: ScanField) => {
+    setValidationErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    const errors = validateScanInput({
+      definition,
+      identifier,
+      containerBarcode,
+      trailerBarcode: context.trailerBarcode,
+      truckUnitNumber: context.truckUnitNumber,
+    });
+    setValidationErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      inputRef.current?.focus();
+      return;
+    }
     await onCapture(selectedAction, identifier.trim(), containerBarcode.trim(), captureGps);
     setIdentifier('');
     if (definition.identifier === 'PACKAGE') setContainerBarcode('');
@@ -115,15 +143,20 @@ export function WorkScreen({
               <span>Trailer barcode</span>
               <input
                 aria-label="Trailer barcode"
+                aria-invalid={Boolean(validationErrors.trailerBarcode)}
                 value={context.trailerBarcode}
-                onChange={(event) => onContextChange({ ...context, trailerBarcode: event.target.value.toUpperCase() })}
-                placeholder="TRL-1002"
+                onChange={(event) => {
+                  clearValidationError('trailerBarcode');
+                  onContextChange({ ...context, trailerBarcode: event.target.value.toUpperCase() });
+                }}
+                placeholder="TRLR123456"
               />
+              {validationErrors.trailerBarcode && <small className="field-error">{validationErrors.trailerBarcode}</small>}
             </label>
           ) : (
             <div className="context-grid">
               <label><span>Route code</span><input aria-label="Route code" value={context.routeCode} onChange={(event) => onContextChange({ ...context, routeCode: event.target.value.toUpperCase() })} placeholder="RTE-101" /></label>
-              <label><span>Truck unit</span><input aria-label="Truck unit" value={context.truckUnitNumber} onChange={(event) => onContextChange({ ...context, truckUnitNumber: event.target.value.toUpperCase() })} placeholder="LMCAL00001" /></label>
+              <label><span>Truck unit</span><input aria-label="Truck unit" aria-invalid={Boolean(validationErrors.truckUnitNumber)} value={context.truckUnitNumber} onChange={(event) => { clearValidationError('truckUnitNumber'); onContextChange({ ...context, truckUnitNumber: event.target.value.toUpperCase() }); }} placeholder="LMCAL00001" />{validationErrors.truckUnitNumber && <small className="field-error">{validationErrors.truckUnitNumber}</small>}</label>
             </div>
           )}
           {recentEvents.some((event) => event.syncState === 'PENDING' || event.syncState === 'PENDING_VALIDATION') && (
@@ -160,17 +193,23 @@ export function WorkScreen({
                 <input
                   ref={inputRef}
                   aria-label={definition.identifier === 'PACKAGE' ? 'Package tracking number' : 'Container barcode'}
+                  aria-invalid={Boolean(validationErrors.identifier)}
                   value={identifier}
-                  onChange={(event) => setIdentifier(event.target.value.toUpperCase())}
-                  placeholder={definition.identifier === 'PACKAGE' ? 'Scan or enter package' : 'Scan or enter container'}
+                  onChange={(event) => {
+                    clearValidationError('identifier');
+                    setIdentifier(event.target.value.toUpperCase());
+                  }}
+                  placeholder="CON1234567"
                 />
               </div>
+              {validationErrors.identifier && <small className="field-error">{validationErrors.identifier}</small>}
             </label>
           )}
           {definition.needsContainer && definition.identifier === 'PACKAGE' && (
             <label>
               <span>Container barcode</span>
-              <div className="scan-input"><Box /><input aria-label="Container barcode" value={containerBarcode} onChange={(event) => setContainerBarcode(event.target.value.toUpperCase())} placeholder="Scan destination container" /></div>
+              <div className="scan-input"><Box /><input aria-label="Container barcode" aria-invalid={Boolean(validationErrors.containerBarcode)} value={containerBarcode} onChange={(event) => { clearValidationError('containerBarcode'); setContainerBarcode(event.target.value.toUpperCase()); }} placeholder="CON1234567" /></div>
+              {validationErrors.containerBarcode && <small className="field-error">{validationErrors.containerBarcode}</small>}
             </label>
           )}
           {definition.delivery && (

@@ -3,6 +3,7 @@ import {
   CONTAINER_IDENTIFIER_PATTERN,
   PACKAGE_IDENTIFIER_PATTERN,
   TRAILER_IDENTIFIER_PATTERN,
+  TRUCK_UNIT_IDENTIFIER_PATTERN,
   packageTypeFromIdentifier,
 } from './asset-identifiers';
 
@@ -27,5 +28,11 @@ describe('asset identifiers', () => {
     expect(TRAILER_IDENTIFIER_PATTERN.test('TRLR123456')).toBe(true);
     expect(TRAILER_IDENTIFIER_PATTERN.test('TRL1234567')).toBe(false);
     expect(TRAILER_IDENTIFIER_PATTERN.test('trlr123456')).toBe(false);
+  });
+
+  it('accepts only generated last-mile and middle-mile truck units', () => {
+    expect(TRUCK_UNIT_IDENTIFIER_PATTERN.test('LMCAL00001')).toBe(true);
+    expect(TRUCK_UNIT_IDENTIFIER_PATTERN.test('MMEDM12345')).toBe(true);
+    expect(TRUCK_UNIT_IDENTIFIER_PATTERN.test('TRLR123456')).toBe(false);
   });
 });

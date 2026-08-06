@@ -3,6 +3,7 @@ import { PackageType } from '@prisma/client';
 export const PACKAGE_IDENTIFIER_PATTERN = /^(MAIL\d{6}|CON\d{7}|NCON\d{6}|DG\d{8})$/;
 export const CONTAINER_IDENTIFIER_PATTERN = PACKAGE_IDENTIFIER_PATTERN;
 export const TRAILER_IDENTIFIER_PATTERN = /^TRLR\d{6}$/;
+export const TRUCK_UNIT_IDENTIFIER_PATTERN = /^(LM|MM)[A-Z]{3}\d{5}$/;
 
 const TYPE_BY_PREFIX: ReadonlyArray<readonly [string, PackageType]> = [
   ['MAIL', PackageType.MAIL],

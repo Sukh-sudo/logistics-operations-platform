@@ -140,7 +140,10 @@ export function App() {
     if (!bootstrap) return;
     setError('');
     const existing = bootstrap.activeSessions.find(
-      (session) => session.taskType === taskType && session.snapshot.currentState !== 'COMPLETED',
+      (session) =>
+        session.taskType === taskType &&
+        session.deviceId === deviceId &&
+        session.snapshot.currentState !== 'COMPLETED',
     );
     if (existing) {
       setActiveSession(existing);
@@ -371,6 +374,9 @@ export function App() {
     ? outbox.filter((event) => event.taskSessionId === activeSession.id)
     : outbox;
   const pendingCount = outbox.filter(isPending).length;
+  const currentDeviceSessions = bootstrap.activeSessions.filter(
+    (session) => session.deviceId === deviceId,
+  );
 
   return (
     <div className="app-background">
@@ -403,7 +409,7 @@ export function App() {
           {view === 'home' && (
             <HomeScreen
               bootstrap={bootstrap}
-              activeSessions={bootstrap.activeSessions}
+              activeSessions={currentDeviceSessions}
               busy={busy}
               online={online}
               onOpenTask={openTask}

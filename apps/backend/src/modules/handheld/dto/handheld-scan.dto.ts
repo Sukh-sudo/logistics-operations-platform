@@ -13,7 +13,14 @@ import {
   Max,
   Min,
   IsNotEmpty,
+  Matches,
 } from 'class-validator';
+import {
+  CONTAINER_IDENTIFIER_PATTERN,
+  PACKAGE_IDENTIFIER_PATTERN,
+  TRAILER_IDENTIFIER_PATTERN,
+  TRUCK_UNIT_IDENTIFIER_PATTERN,
+} from '../../../common/domain/asset-identifiers';
 
 export class HandheldScanDto {
   @ApiProperty({ description: 'Server task-session aggregate ID' })
@@ -44,16 +51,25 @@ export class HandheldScanDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Matches(PACKAGE_IDENTIFIER_PATTERN, {
+    message: 'trackingNumber must be MAIL + 6 digits, CON + 7 digits, NCON + 6 digits, or DG + 8 digits',
+  })
   trackingNumber?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Matches(CONTAINER_IDENTIFIER_PATTERN, {
+    message: 'containerBarcode must be MAIL + 6 digits, CON + 7 digits, NCON + 6 digits, or DG + 8 digits',
+  })
   containerBarcode?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Matches(TRAILER_IDENTIFIER_PATTERN, {
+    message: 'trailerBarcode must be TRLR followed by exactly 6 digits',
+  })
   trailerBarcode?: string;
 
   @ApiPropertyOptional()
@@ -64,6 +80,9 @@ export class HandheldScanDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Matches(TRUCK_UNIT_IDENTIFIER_PATTERN, {
+    message: 'truckUnitNumber must be LM or MM, a 3-letter terminal code, and 5 digits',
+  })
   truckUnitNumber?: string;
 
   @ApiPropertyOptional()
