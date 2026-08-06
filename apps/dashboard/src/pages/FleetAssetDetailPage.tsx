@@ -1,6 +1,6 @@
 import type { DriverDto, TruckDto } from '@logistics/shared-types';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Building2, CalendarClock, Contact, Truck } from 'lucide-react';
+import { Building2, CalendarClock, Contact, Truck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/ViewStates';
@@ -25,8 +25,7 @@ export function FleetAssetDetailPage({ kind, id }: Props) {
   const Icon = kind === 'truck' ? Truck : Contact;
 
   return <div className="mx-auto max-w-6xl">
-    <Link to="/fleet" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-brand-700"><ArrowLeft className="h-4 w-4"/>Back to fleet</Link>
-    <header className="mt-5 flex items-start justify-between"><div><p className="text-sm font-medium text-brand-600">{kind === 'truck' ? 'Fleet vehicle' : 'Fleet driver'}</p><h2 className="mt-1 flex items-center gap-3 text-2xl font-semibold text-slate-900"><Icon className="h-6 w-6"/>{title}</h2><p className="mt-2 text-slate-500">Snapshot-backed availability and equipment assignment history.</p></div><StatusBadge value={data.snapshot?.currentStatus ?? data.status}/></header>
+    <header className="flex items-start justify-between"><div><p className="text-sm font-medium text-brand-600">{kind === 'truck' ? 'Fleet vehicle' : 'Fleet driver'}</p><h2 className="mt-1 flex items-center gap-3 text-2xl font-semibold text-slate-900"><Icon className="h-6 w-6"/>{title}</h2><p className="mt-2 text-slate-500">Snapshot-backed availability and equipment assignment history.</p></div><StatusBadge value={data.snapshot?.currentStatus ?? data.status}/></header>
     <section className="mt-7 grid gap-4 md:grid-cols-3">
       <Detail label={kind === 'truck' ? 'License plate' : 'License number'} value={truck?.licensePlate ?? driver!.licenseNumber}/>
       {truck && <Detail label="Purpose" value={truck.purpose?.replaceAll('_', ' ') ?? 'Legacy unit'}/>}

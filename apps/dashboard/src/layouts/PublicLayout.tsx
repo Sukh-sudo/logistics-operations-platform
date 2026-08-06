@@ -1,5 +1,6 @@
 import { Boxes, HeartPulse, LogIn, MapPinned } from 'lucide-react';
 import { Link, Outlet } from 'react-router-dom';
+import { PageBackButton } from '../components/navigation/PageBackButton';
 
 /**
  * Public tracking and health endpoints deliberately avoid AuthProvider gates.
@@ -20,6 +21,6 @@ export function PublicLayout() {
         </nav>
       </div>
     </header>
-    <main className="mx-auto max-w-7xl px-6 py-8"><Outlet/></main>
+    <main className="mx-auto max-w-7xl px-6 py-8"><PageBackButton className="mb-5"/><Outlet/></main>
   </div>;
 }
