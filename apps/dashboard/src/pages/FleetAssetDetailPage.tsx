@@ -13,7 +13,7 @@ const formatDate = (value?: string | null) => value ? new Intl.DateTimeFormat(un
 export function FleetAssetDetailPage({ kind, id }: Props) {
   // Current status comes only from the snapshot-backed detail endpoint.
   const asset = useQuery<TruckDto | DriverDto>({ queryKey: ['fleet', kind, id], queryFn: async () => kind === 'truck' ? await fleetApi.truck(id) : await fleetApi.driver(id) });
-  const assignments = useQuery({ queryKey: ['fleet', 'assignments'], queryFn: fleetApi.assignments });
+  const assignments = useQuery({ queryKey: ['fleet', 'assignments'], queryFn: () => fleetApi.assignments() });
   if (asset.isLoading || assignments.isLoading) return <LoadingState/>;
   if (asset.isError || assignments.isError || !asset.data) return <ErrorState message={`Could not load ${kind} details.`}/>;
 

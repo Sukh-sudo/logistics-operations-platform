@@ -5,6 +5,7 @@ import { CreateTruckDto } from '../dto/create-truck.dto';
 import { FleetService } from '../services/fleet.service';
 import { AssignEquipmentDto } from '../dto/assign-equipment.dto';
 import { FleetAvailabilityQueryDto } from '../dto/fleet-availability-query.dto';
+import { AssignmentListQueryDto, DriverListQueryDto, TruckListQueryDto } from '../dto/fleet-list-query.dto';
 
 @Controller('fleet')
 export class FleetController {
@@ -16,8 +17,8 @@ export class FleetController {
   }
 
   @Get('trucks')
-  getTrucks() {
-    return this.fleetService.getTrucks();
+  getTrucks(@Query() query: TruckListQueryDto) {
+    return this.fleetService.getTrucks(query);
   }
 
   @Get('trucks/:id')
@@ -31,8 +32,8 @@ export class FleetController {
   }
 
   @Get('drivers')
-  getDrivers() {
-    return this.fleetService.getDrivers();
+  getDrivers(@Query() query: DriverListQueryDto) {
+    return this.fleetService.getDrivers(query);
   }
 
   @Get('drivers/:id')
@@ -51,8 +52,8 @@ export class FleetController {
   }
 
   @Get('assignments')
-  getAssignments() {
-    return this.fleetService.getAssignments();
+  getAssignments(@Query() query: AssignmentListQueryDto) {
+    return this.fleetService.getAssignments(query);
   }
 
   @Post('assignments/:id/release')

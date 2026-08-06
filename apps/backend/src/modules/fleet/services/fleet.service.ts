@@ -5,6 +5,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CreateDriverDto } from '../dto/create-driver.dto';
 import { CreateTruckDto } from '../dto/create-truck.dto';
 import { AssignEquipmentDto } from '../dto/assign-equipment.dto';
+import { AssignmentListQueryDto, DriverListQueryDto, TruckListQueryDto } from '../dto/fleet-list-query.dto';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -119,9 +120,13 @@ export class FleetService {
     });
   }
 
-  getTrucks() {
+  getTrucks(filters: TruckListQueryDto = {}) {
     // Operational reads use the snapshot relation instead of rebuilding state from events.
     return this.prisma.truck.findMany({
+      where: {
+        ...(filters.terminalId !== undefined && { terminalId: filters.terminalId }),
+        ...(filters.status && { status: filters.status }),
+      },
       include: { terminal: true, snapshot: true },
       orderBy: { unitNumber: 'asc' },
     });
@@ -136,9 +141,13 @@ export class FleetService {
     return truck;
   }
 
-  getDrivers() {
+  getDrivers(filters: DriverListQueryDto = {}) {
     // Operational reads use the snapshot relation instead of rebuilding state from events.
     return this.prisma.driver.findMany({
+      where: {
+        ...(filters.terminalId !== undefined && { terminalId: filters.terminalId }),
+        ...(filters.status && { status: filters.status }),
+      },
       include: { terminal: true, snapshot: true },
       orderBy: { employeeId: 'asc' },
     });
@@ -253,8 +262,15 @@ export class FleetService {
     });
   }
 
-  getAssignments() {
-    return this.prisma.equipmentAssignment.findMany({ include: { trip: true, truck: true, driver: true, trailer: true }, orderBy: { assignedAt: 'desc' } });
+  getAssignments(filters: AssignmentListQueryDto = {}) {
+    return this.prisma.equipmentAssignment.findMany({
+      where: {
+        ...(filters.terminalId !== undefined && { truck: { terminalId: filters.terminalId } }),
+        ...(filters.status && { status: filters.status }),
+      },
+      include: { trip: true, truck: true, driver: true, trailer: true },
+      orderBy: { assignedAt: 'desc' },
+    });
   }
 
   private async ensureTerminalExists(tx: TransactionClient, terminalId?: number) {

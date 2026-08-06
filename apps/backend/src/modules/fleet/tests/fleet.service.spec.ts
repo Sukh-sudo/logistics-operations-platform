@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { DriverStatus, FleetEventType, TruckPurpose, TruckStatus } from '@prisma/client';
+import { DriverStatus, EquipmentAssignmentStatus, FleetEventType, TruckPurpose, TruckStatus } from '@prisma/client';
 import { FleetService } from '../services/fleet.service';
 
 describe('FleetService', () => {
@@ -245,5 +245,31 @@ describe('FleetService', () => {
 
     expect(prisma.truckSnapshot.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ currentTerminalId: 7, currentStatus: TruckStatus.AVAILABLE }) }));
     expect(result).toMatchObject({ trucks: [{ id: 'truck-1' }], drivers: [{ id: 'driver-1' }], trailers: [{ id: 'trailer-1' }] });
+  });
+
+  it('filters trucks and drivers by terminal and status', async () => {
+    await service.getTrucks({ terminalId: 7, status: TruckStatus.MAINTENANCE });
+    await service.getDrivers({ terminalId: 7, status: DriverStatus.OFF_DUTY });
+
+    expect(prisma.truck.findMany).toHaveBeenCalledWith({
+      where: { terminalId: 7, status: TruckStatus.MAINTENANCE },
+      include: { terminal: true, snapshot: true },
+      orderBy: { unitNumber: 'asc' },
+    });
+    expect(prisma.driver.findMany).toHaveBeenCalledWith({
+      where: { terminalId: 7, status: DriverStatus.OFF_DUTY },
+      include: { terminal: true, snapshot: true },
+      orderBy: { employeeId: 'asc' },
+    });
+  });
+
+  it('filters assignment history through the truck terminal and assignment status', async () => {
+    await service.getAssignments({ terminalId: 7, status: EquipmentAssignmentStatus.RELEASED });
+
+    expect(prisma.equipmentAssignment.findMany).toHaveBeenCalledWith({
+      where: { truck: { terminalId: 7 }, status: EquipmentAssignmentStatus.RELEASED },
+      include: { trip: true, truck: true, driver: true, trailer: true },
+      orderBy: { assignedAt: 'desc' },
+    });
   });
 });
