@@ -4,9 +4,11 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { ContainerService } from '../../containers/services/container.service';
 import { PackageService } from '../../packages/services/package.service';
 import { TrailerService } from '../../trailers/services/trailer.service';
+import { AllowAuthenticated } from '../../authorization/decorators/allow-authenticated.decorator';
 
 @ApiTags('Handheld lookup')
 @Controller('api/mobile/v1')
+@AllowAuthenticated()
 export class HandheldLookupController {
   constructor(
     private readonly prisma: PrismaService,

@@ -4,8 +4,11 @@ import { CreateShipmentDto } from '../dto/create-shipment.dto';
 import { ShipmentPackageDto } from '../dto/shipment-package.dto';
 import { UpdateShipmentDto } from '../dto/update-shipment.dto';
 import { ShipmentService } from '../services/shipment.service';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @Controller('shipments')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class ShipmentController {
   constructor(private readonly service: ShipmentService) {}
 

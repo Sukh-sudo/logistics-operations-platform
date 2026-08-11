@@ -6,8 +6,10 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 import { Public } from '../decorators/public.decorator';
 import { AuthService } from '../services/auth.service';
+import { AllowAuthenticated } from '../../authorization/decorators/allow-authenticated.decorator';
 
 @Controller('auth')
+@AllowAuthenticated()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

@@ -4,8 +4,11 @@ import { CreateTripDto } from '../dto/create-trip.dto';
 import { TripStopActionDto } from '../dto/trip-stop-action.dto';
 import { UpdateTripDto } from '../dto/update-trip.dto';
 import { TripService } from '../services/trip.service';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @Controller('trips')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class TripController {
   constructor(private readonly service: TripService) {}
 

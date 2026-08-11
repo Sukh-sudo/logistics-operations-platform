@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -78,6 +79,14 @@ export class AuthService {
    * introduced later without changing downstream authorization.
    */
   async loginHandheld(dto: HandheldLoginDto, requestId?: string) {
+    // Badge and employee number are portfolio identifiers, not independent
+    // authentication factors. Keep this legacy flow unavailable in production
+    // until PIN/password or managed-device enrollment is selected.
+    if (process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableException(
+        'Production handheld authentication is not configured',
+      );
+    }
     const badgeBarcode = dto.badgeBarcode.trim().toUpperCase();
     const employeeNumber = dto.employeeId.trim().toUpperCase();
     return this.prisma.$transaction(async (tx) => {

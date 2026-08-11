@@ -6,8 +6,11 @@ import { FleetService } from '../services/fleet.service';
 import { AssignEquipmentDto } from '../dto/assign-equipment.dto';
 import { FleetAvailabilityQueryDto } from '../dto/fleet-availability-query.dto';
 import { AssignmentListQueryDto, DriverListQueryDto, TruckListQueryDto } from '../dto/fleet-list-query.dto';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @Controller('fleet')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class FleetController {
   constructor(private readonly fleetService: FleetService) {}
 

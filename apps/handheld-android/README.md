@@ -40,8 +40,12 @@ backend running on the emulator host. Override it for a physical device:
 .\gradlew.bat assembleDebug -PhandheldApiBaseUrl="http://192.168.1.20:3000/api/mobile/v1/"
 ```
 
-The URL must end in `/`. Cleartext HTTP is enabled for local portfolio demos;
-use HTTPS and a network security configuration for production deployment.
+The URL must end in `/`. Cleartext HTTP is enabled only in the debug manifest.
+Release builds reject cleartext traffic and must supply the deployed HTTPS URL:
+
+```powershell
+.\gradlew.bat assembleRelease -PhandheldApiBaseUrl="https://api.example.com/api/mobile/v1/"
+```
 
 ## Build and test
 

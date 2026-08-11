@@ -144,6 +144,20 @@ describe('Authentication and authorization (e2e)', () => {
       .set('Authorization', `Bearer ${login.body.accessToken}`)
       .expect(200, { authorized: true });
 
+    // A valid account cannot cross into unrelated operational or recovery APIs.
+    await request(app.getHttpServer())
+      .get('/terminals')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/notifications')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/snapshots/rebuild')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(403);
+
     await request(app.getHttpServer())
       .delete(`/users/${userId}/roles/${role.body.role.id}`)
       .set('Authorization', administratorAuthorization)

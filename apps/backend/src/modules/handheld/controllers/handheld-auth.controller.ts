@@ -6,9 +6,11 @@ import { LogoutDto, RefreshTokenDto } from '../../auth/dto/refresh-token.dto';
 import { AuthService } from '../../auth/services/auth.service';
 import { HandheldLoginDto } from '../dto/handheld-login.dto';
 import { HandheldService } from '../services/handheld.service';
+import { AllowAuthenticated } from '../../authorization/decorators/allow-authenticated.decorator';
 
 @ApiTags('Handheld')
 @Controller('api/mobile/v1')
+@AllowAuthenticated()
 export class HandheldAuthController {
   constructor(
     private readonly auth: AuthService,

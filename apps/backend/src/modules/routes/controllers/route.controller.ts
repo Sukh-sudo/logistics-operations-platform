@@ -12,9 +12,12 @@ import type { RequestWithId } from '../../../common/middleware/request-id.middle
 import { AddStopDto } from '../dto/add-stop.dto';
 import { CreateRouteDto } from '../dto/create-route.dto';
 import { UpdateRouteDto } from '../dto/update-route.dto';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 import { RouteService } from '../services/route.service';
 
 @Controller('routes')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class RouteController {
   constructor(private readonly routeService: RouteService) {}
 

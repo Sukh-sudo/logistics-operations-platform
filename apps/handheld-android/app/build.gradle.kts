@@ -19,12 +19,6 @@ android {
         testInstrumentationRunner = "com.logistics.handheld.HiltTestRunner"
         vectorDrawables.useSupportLibrary = true
 
-        // Android emulators reach the host backend through 10.0.2.2.
-        buildConfigField(
-            "String",
-            "HANDHELD_API_BASE_URL",
-            "\"${providers.gradleProperty("handheldApiBaseUrl").orElse("http://10.0.2.2:3000/api/mobile/v1/").get()}\"",
-        )
     }
 
     buildFeatures {
@@ -42,8 +36,20 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            // Android emulators reach the host backend through 10.0.2.2.
+            buildConfigField(
+                "String",
+                "HANDHELD_API_BASE_URL",
+                "\"${providers.gradleProperty("handheldApiBaseUrl").orElse("http://10.0.2.2:3000/api/mobile/v1/").get()}\"",
+            )
         }
         release {
+            // Release builds default to a non-routable HTTPS placeholder.
+            buildConfigField(
+                "String",
+                "HANDHELD_API_BASE_URL",
+                "\"${providers.gradleProperty("handheldApiBaseUrl").orElse("https://api.example.invalid/api/mobile/v1/").get()}\"",
+            )
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

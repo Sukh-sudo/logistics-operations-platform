@@ -3,9 +3,12 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { DeliveryReportQueryDto } from '../dto/delivery-report-query.dto';
 import { ReportingService } from '../services/reporting.service';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @ApiTags('Reporting')
 @Controller('reports')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class ReportingController {
   constructor(private readonly service: ReportingService) {}
 

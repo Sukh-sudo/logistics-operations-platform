@@ -11,7 +11,7 @@ import {
   UserEventType,
   UserStatus,
 } from '@prisma/client';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CredentialService } from '../../auth/services/credential.service';
 import { CreatePermissionDto } from '../dto/create-permission.dto';
@@ -32,7 +32,7 @@ export class UserService {
 
   async bootstrapAdmin(dto: BootstrapAdminDto, requestId?: string) {
     const configuredSecret = process.env.BOOTSTRAP_ADMIN_SECRET;
-    if (!configuredSecret || dto.bootstrapSecret !== configuredSecret) {
+    if (!configuredSecret || !this.secretsMatch(dto.bootstrapSecret, configuredSecret)) {
       throw new BadRequestException('Invalid bootstrap secret');
     }
     const correlationId = requestId ?? randomUUID();
@@ -42,6 +42,11 @@ export class UserService {
     const permissionCodes = Object.values(PERMISSIONS).sort();
 
     return this.prisma.$transaction(async (tx) => {
+      // Bootstrap is a one-time empty-system operation. Serializable isolation
+      // prevents concurrent requests from provisioning two initial admins.
+      if (await tx.user.findFirst({ select: { id: true } })) {
+        throw new ConflictException('Administrator bootstrap is disabled');
+      }
       if (await tx.user.findFirst({ where: { OR: [{ employeeNumber }, { email }] } })) {
         throw new ConflictException('Administrator identity already exists');
       }
@@ -79,7 +84,14 @@ export class UserService {
         data: { userId: user.id, employeeNumber, email, firstName: user.firstName, lastName: user.lastName, currentStatus: UserStatus.ACTIVE, roleNames: [role.name], permissions: permissionCodes, lastActivityAt: activated.createdAt },
       });
       return { user: { id: user.id, employeeNumber, email, firstName: user.firstName, lastName: user.lastName }, role: role.name, permissions: permissionCodes, snapshot, eventsCreated: 3, createdAt: created.createdAt };
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
+  private secretsMatch(provided: string, configured: string) {
+    // Hashing to a fixed width lets timingSafeEqual handle different input lengths.
+    const providedDigest = createHash('sha256').update(provided).digest();
+    const configuredDigest = createHash('sha256').update(configured).digest();
+    return timingSafeEqual(providedDigest, configuredDigest);
   }
 
   async createUser(dto: CreateUserDto, requestId?: string) {

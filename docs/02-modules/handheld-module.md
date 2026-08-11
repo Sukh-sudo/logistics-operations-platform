@@ -9,7 +9,9 @@ authoritative package, container, and trailer rules to their existing services.
 
 ## Implemented server contract
 
-- Badge barcode plus employee-number login and normal JWT issuance.
+- Badge barcode plus employee-number login and normal JWT issuance for
+  non-production portfolio environments. Production fails closed pending a
+  stronger authentication decision.
 - Permanent-terminal bootstrap with authorized task categories and thresholds.
 - Event-driven task sessions with a rebuildable snapshot and auditable active
   intervals.

@@ -1,4 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer, } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 
 // Database infrastructure module
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
@@ -32,6 +33,8 @@ import { ReportingModule } from './modules/reporting/reporting.module';
 import { SnapshotModule } from './modules/snapshots/snapshot.module';
 import { ObservabilityModule } from './common/observability/observability.module';
 import { HandheldModule } from './modules/handheld/handheld.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from './modules/authorization/guards/permissions.guard';
 
 @Module({
   imports: [
@@ -81,6 +84,11 @@ import { HandheldModule } from './modules/handheld/handheld.module';
     ObservabilityModule,
 
     HandheldModule,
+  ],
+  providers: [
+    // Guard order is intentional: establish identity before checking policy.
+    { provide: APP_GUARD, useExisting: JwtAuthGuard },
+    { provide: APP_GUARD, useExisting: PermissionsGuard },
   ],
 })
 export class AppModule implements NestModule {

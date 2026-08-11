@@ -12,7 +12,8 @@ export async function createAuthenticatedAdmin(
   const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   const permissionIds: string[] = [];
 
-  for (const code of ['user.manage', 'role.manage']) {
+  // Integration administrators exercise the same explicit policies as production.
+  for (const code of ['user.manage', 'role.manage', 'system.admin']) {
     const existing = await prisma.permission.findUnique({ where: { code } });
     const permission =
       existing ??

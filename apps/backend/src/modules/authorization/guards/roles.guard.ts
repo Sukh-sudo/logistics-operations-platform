@@ -25,7 +25,7 @@ export class RolesGuard implements CanActivate {
       .getRequest<AuthenticatedRequest>().user;
     const normalized = roles.map((role) => role.toUpperCase());
     if (
-      normalized.includes('ADMINISTRATOR') ||
+      normalized.some((role) => ['ADMIN', 'ADMINISTRATOR'].includes(role)) ||
       required.some((role) => normalized.includes(role.toUpperCase()))
     ) {
       return true;

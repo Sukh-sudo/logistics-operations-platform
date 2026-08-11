@@ -66,7 +66,11 @@ GET /health
 GET /tracking/{shipmentNumber}
 ```
 
-Protected endpoints require a valid JWT.
+Protected endpoints require a valid JWT and an explicit authorization policy.
+Routes without declared permissions or an authenticated self-service marker
+are denied by default. The administrator bootstrap route is public only while
+the user store is empty and should be disabled operationally by removing
+`BOOTSTRAP_ADMIN_SECRET` after initial provisioning.
 
 ---
 
@@ -496,7 +500,7 @@ GET /health/kafka
 GET /metrics
 ```
 
-Metrics require authentication. Health routes are public.
+Metrics require `system.admin`. Health routes are public.
 
 ---
 
@@ -504,6 +508,10 @@ Metrics require authentication. Health routes are public.
 
 The mobile contract uses `/api/mobile/v1` and requires JWT authentication
 except for the initial online login and token refresh.
+
+Badge plus employee-number login is a non-production portfolio flow. The
+backend fails closed for this flow when `NODE_ENV=production` until a stronger
+employee PIN/password or managed-device enrollment design is implemented.
 
 ```text
 POST /api/mobile/v1/auth/login

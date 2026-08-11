@@ -6,9 +6,12 @@ import { HandheldDashboardQueryDto } from '../dto/handheld-dashboard-query.dto';
 import { PackageListQueryDto } from '../dto/package-list-query.dto';
 import { ContainerListQueryDto } from '../dto/container-list-query.dto';
 import { TrailerListQueryDto } from '../dto/trailer-list-query.dto';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @ApiTags('Dashboard')
 @Controller('dashboard')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class DashboardController {
   constructor(
     private readonly dashboardService: DashboardService,

@@ -4,9 +4,11 @@ import type { AuthenticatedRequest } from '../../auth/interfaces/authenticated-r
 import { HandheldScanDto } from '../dto/handheld-scan.dto';
 import { HandheldSyncDto } from '../dto/sync.dto';
 import { HandheldService } from '../services/handheld.service';
+import { AllowAuthenticated } from '../../authorization/decorators/allow-authenticated.decorator';
 
 @ApiTags('Handheld scans')
 @Controller('api/mobile/v1')
+@AllowAuthenticated()
 export class HandheldScanController {
   constructor(private readonly handheld: HandheldService) {}
 

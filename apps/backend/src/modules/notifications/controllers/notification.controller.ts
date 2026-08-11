@@ -12,9 +12,12 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
 import { NotificationQueryDto } from '../dto/notification-query.dto';
 import { NotificationService } from '../services/notification.service';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @ApiTags('Notifications')
 @Controller('notifications')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class NotificationController {
   constructor(private readonly service: NotificationService) {}
 

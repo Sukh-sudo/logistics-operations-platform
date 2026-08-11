@@ -9,6 +9,8 @@ import {
   Req,
 } from '@nestjs/common';
 import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 import { CreateTerminalDto } from '../dto/create-terminal.dto';
 import {
   ReceiveTerminalAssetDto,
@@ -18,6 +20,7 @@ import { UpdateTerminalDto } from '../dto/update-terminal.dto';
 import { TerminalService } from '../services/terminal.service';
 
 @Controller('terminals')
+@Permissions(PERMISSIONS.TERMINAL_MANAGE)
 export class TerminalController {
   constructor(private readonly terminalService: TerminalService) {}
 

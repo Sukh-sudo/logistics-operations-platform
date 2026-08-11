@@ -1,465 +1,249 @@
+<div align="center">
+
 # Logistics Operations Platform
 
-> An enterprise-grade, event-driven logistics operations platform built with NestJS, Prisma, PostgreSQL, and TypeScript.
+### From the first warehouse scan to final delivery
+
+A full-stack logistics platform that models how packages, containers, trailers,
+terminals, routes, and delivery teams work together across a transportation
+network.
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=111827)](https://react.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Android](https://img.shields.io/badge/Android-Kotlin-3DDC84?style=for-the-badge&logo=android&logoColor=white)](apps/handheld-android/README.md)
+
+[![Last commit](https://img.shields.io/github/last-commit/Sukh-sudo/logistics-operations-platform?style=flat-square)](https://github.com/Sukh-sudo/logistics-operations-platform/commits)
+[![Repository size](https://img.shields.io/github/repo-size/Sukh-sudo/logistics-operations-platform?style=flat-square)](https://github.com/Sukh-sudo/logistics-operations-platform)
+![Project status](https://img.shields.io/badge/status-active_development-22c55e?style=flat-square)
+
+[What it does](#what-it-does) | [Architecture](#architecture) | [Applications](#applications) | [Getting started](#getting-started) | [Documentation](#documentation)
+
+</div>
 
 ---
 
-## Overview
+## The project
 
-The Logistics Operations Platform is a backend system designed to model real-world parcel and freight logistics operations. It provides a scalable, event-driven architecture for tracking packages, containers, trailers, terminals, routes, shipments, and operational workflows.
+The Logistics Operations Platform is a portfolio-scale transportation and
+warehouse management system. It follows freight through terminals and vehicles
+while giving operators a live view of where each package is, how it got there,
+and what should happen next.
 
-The project is intentionally designed as a portfolio-quality enterprise application that demonstrates modern backend architecture, domain-driven design principles, event sourcing concepts, CQRS-inspired read/write separation, transactional consistency, and production-ready development practices.
+Unlike a basic CRUD application, every meaningful operation creates an
+immutable business event. Rebuildable snapshot models provide fast access to
+the latest state, giving the platform both a complete audit trail and practical
+operational performance.
 
-The long-term vision is to build a complete logistics platform capable of supporting distribution centers, cross-dock facilities, transportation networks, and operational dashboards.
+> This project explores how real logistics software can remain traceable,
+> resilient, and understandable as freight moves through many hands and systems.
 
----
+## What it does
 
-# Current Status
+| Capability | What it provides |
+| --- | --- |
+| Freight operations | Receive, sort, load, unload, dispatch, arrive, and deliver packages |
+| Asset management | Track containers, trailers, trucks, drivers, and equipment assignments |
+| Transportation | Build terminal routes, schedule trips, and follow stop-by-stop execution |
+| Customer visibility | Track multi-package shipments and delivery progress without exposing internal data |
+| Operations intelligence | Search assets, review timelines, monitor health, and generate delivery reports |
+| Handheld workflows | Scan barcodes, work offline, synchronize commands, and handle delivery exceptions |
+| Platform security | Authenticate staff with JWTs and protect actions with roles and permissions |
 
-**Project Phase:** Core Logistics Engine
+## A package's journey
 
-### Implemented
-
-- Package lifecycle engine
-- Package event sourcing
-- Package snapshots
-- Package location tracking
-- Package history
-- Container management
-- Package → Container workflows
-- Trailer management
-- Container → Trailer workflows
-- Loose Package → Trailer workflows
-- Operational dashboard
-- Unified search
-- Health monitoring
-- Swagger API documentation
-- Correlation IDs
-- Integration testing
-- PostgreSQL persistence
-- Prisma ORM
-- Native Android handheld with Compose, Room, WorkManager, and CameraX/ML Kit
-
-### Scaffolded
-
-The following modules already exist in the project structure and will be implemented in future development:
-
-- Users
-- Authentication
-- Analytics
-- Terminals
-- Routes
-- Shipments
-
----
-
-# Business Domain
-
-The system models the operational hierarchy commonly found in transportation and parcel logistics.
-
-```
-Terminal
-│
-├── Routes
-│
-├── Trailers
-│     │
-│     ├── Containers
-│     │      │
-│     │      └── Packages
-│     │
-│     └── Loose Packages
-│
-├── Shipments
-│
-└── Employees
+```text
+Received -> Sorted -> Container / Trailer -> In Transit ->
+Arrived -> Out for Delivery -> Delivered
 ```
 
----
+At every step, the platform records the business event, updates the relevant
+snapshot, preserves relationship history, and makes the new state available to
+the dashboard and customer tracking experience.
 
-# Design Principles
+## Architecture
 
-The platform follows several architectural principles.
+```mermaid
+flowchart LR
+    Dashboard[Operations Dashboard]
+    Simulator[Handheld Simulator]
+    Android[Android Scanner]
+    API[NestJS REST API]
+    Domains[Logistics Domain Services]
+    Events[(Immutable Events)]
+    Snapshots[(Snapshot Read Models)]
+    Postgres[(PostgreSQL)]
+    Kafka[Kafka - Optional]
 
-- Event-driven design
-- Immutable operational history
-- Snapshot read models
-- Modular architecture
-- Transactional consistency
-- Strong domain boundaries
-- Scalable module design
-- Comprehensive integration testing
-
----
-
-# Technology Stack
-
-| Layer | Technology |
-|----------|------------|
-| Runtime | Node.js |
-| Language | TypeScript |
-| Framework | NestJS |
-| ORM | Prisma |
-| Database | PostgreSQL |
-| Validation | class-validator |
-| API Docs | Swagger |
-| Testing | Jest + Supertest |
-| Package Manager | pnpm |
-| Messaging | Kafka (planned) |
-| Containerization | Docker (planned) |
-
----
-
-# Current Modules
-
-```
-src/modules
-
-analytics/
-auth/
-containers/
-dashboard/
-health/
-packages/
-routes/
-search/
-shipments/
-terminals/
-trailers/
-users/
+    Dashboard --> API
+    Simulator --> API
+    Android --> API
+    API --> Domains
+    Domains -->|Prisma transaction| Events
+    Domains -->|Prisma transaction| Snapshots
+    Events --> Postgres
+    Snapshots --> Postgres
+    Domains -.-> Kafka
 ```
 
----
+The main architectural rules are deliberately consistent:
 
-# Architecture
+- Business actions create immutable, timestamped events.
+- Current state lives in disposable, rebuildable snapshots.
+- Related writes commit together inside Prisma transactions.
+- Controllers stay thin while services own business behavior.
+- Correlation IDs connect activity across modules and logs.
+- Kafka publication is optional, so local workflows remain usable without a broker.
 
-The application follows a layered architecture.
+## Applications
 
+| Application | Experience | Location |
+| --- | --- | --- |
+| Operations dashboard | React workspace for dispatchers, supervisors, and administrators | [`apps/dashboard`](apps/dashboard) |
+| Backend API | NestJS business services, Prisma persistence, Swagger, and security | [`apps/backend`](apps/backend) |
+| Handheld simulator | Browser-based scanner and offline-sync demonstration | [`apps/handheld-simulator`](apps/handheld-simulator) |
+| Native handheld | Android scanner built with Compose, Room, WorkManager, CameraX, and ML Kit | [`apps/handheld-android`](apps/handheld-android) |
+
+## Platform highlights
+
+- Package, container, trailer, terminal, route, trip, shipment, and fleet domains
+- Event history and current-state snapshots for operational aggregates
+- Customer-safe shipment tracking and in-app notifications
+- Delivery performance reports with terminal and date filtering
+- Offline-first handheld outbox with idempotent synchronization
+- Snapshot recovery, health checks, metrics, request tracing, and Swagger docs
+- Unit, component, integration, and PostgreSQL-backed end-to-end testing
+
+## Technology
+
+```text
+Frontend       React 19 | Vite | React Router | TanStack Query | Recharts
+Backend        NestJS 11 | TypeScript | Prisma | Swagger | KafkaJS
+Database       PostgreSQL 16
+Android        Kotlin | Jetpack Compose | Room | WorkManager | CameraX | ML Kit
+Testing        Jest | Supertest | Vitest | Testing Library | Android/JUnit
+Workspace      pnpm | Turborepo | Docker Compose
 ```
-HTTP Request
 
-↓
+## Current status
 
-Controller
+The core logistics engine and the first four implementation phases are built:
 
-↓
+- **Phase 1:** Packages, containers, trailers, dashboard, search, and health
+- **Phase 2:** Terminals, routes, trips, shipments, identity, and authorization
+- **Phase 3:** Fleet, trucks, drivers, and equipment assignments
+- **Phase 4:** Customer tracking, notifications, and delivery reporting
 
-Service
+The next phase explores analytics, forecasting, GIS, GPS tracking, and richer
+live operational dashboards.
 
-↓
+This remains an actively developed portfolio and learning project. It uses
+production-oriented patterns, but it requires a dedicated security review,
+load testing, and managed infrastructure before real operational use.
 
-Prisma Transaction
+## Getting started
 
-↓
+<details>
+<summary><strong>Open the local development guide</strong></summary>
 
-Database
+### Prerequisites
 
-├── Event Tables
+- Node.js
+- pnpm 11
+- Docker Desktop or another Docker-compatible runtime
 
-├── Snapshot Tables
-
-└── History Tables
-
-↓
-
-HTTP Response
-```
-
-Every write operation updates:
-
-- Immutable event log
-- Snapshot model
-- Relationship history (where applicable)
-
----
-
-# Core Workflows
-
-Currently implemented workflows include:
-
-### Packages
-
-- Receive package
-- Sort package
-- Load package into container
-- Unload package from container
-- Load package directly into trailer
-- Unload package from trailer
-- Query package location
-- View package history
-
-### Containers
-
-- Create container
-- Load packages
-- Unload packages
-- Load container into trailer
-- Unload container from trailer
-- Query container
-- View container history
-
-### Trailers
-
-- Create trailer
-- Load containers
-- Unload containers
-- Load loose packages
-- Unload loose packages
-- Query trailer
-- View trailer history
-- View trailer manifest
-
----
-
-# Planned Modules
-
-The long-term platform includes:
-
-## Users
-
-Authentication
-
-Authorization
-
-Roles
-
-Permissions
-
-Employees
-
----
-
-## Terminals
-
-Receiving
-
-Sorting
-
-Dispatch
-
-Arrival
-
-Capacity Management
-
-Dock Management
-
----
-
-## Routes
-
-Origin
-
-Destination
-
-Scheduling
-
-Departure
-
-Arrival
-
-Driver Assignment
-
-Trailer Assignment
-
----
-
-## Shipments
-
-Shipment Creation
-
-Package Assignment
-
-Customer Tracking
-
-Delivery Confirmation
-
----
-
-## Analytics
-
-Operational KPIs
-
-Terminal Throughput
-
-Trailer Utilization
-
-Container Utilization
-
-Forecasting
-
----
-
-# Development
-
-## Install Dependencies
+### Install and configure
 
 ```bash
 pnpm install
+docker compose -f infrastructure/docker/docker-compose.yml up -d
 ```
 
----
+Create `apps/backend/.env`:
 
-## Generate Prisma Client
+```dotenv
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/logistics_platform?schema=public"
+BOOTSTRAP_ADMIN_SECRET="replace-with-a-long-random-bootstrap-secret"
+JWT_ACCESS_SECRET="replace-with-a-long-random-jwt-secret"
+```
+
+Prepare the database:
 
 ```bash
 pnpm prisma generate
+pnpm prisma migrate deploy
 ```
 
----
+### Start the applications
 
-## Apply Database Migrations
-
-```bash
-pnpm prisma migrate dev
-```
-
----
-
-## Start Development Server
+Run each command in a separate terminal:
 
 ```bash
+# API - http://localhost:3000
 pnpm start:dev
-```
 
----
+# Dashboard - http://localhost:5173
+pnpm --filter dashboard dev
 
-## Build
-
-```bash
-pnpm build
-```
-
----
-
-## Run Tests
-
-```bash
-pnpm test
-```
-
----
-
-## Run Integration Tests
-
-```bash
-pnpm test:e2e
-```
-
----
-
-# API Documentation
-
-Swagger UI
-
-```
-http://localhost:3000/api/docs
-```
-
----
-
-# Repository Structure
-
-```
-apps/
-    backend/
-    dashboard/
-    handheld-simulator/
-    handheld-android/
-
-docs/
-
-README.md
-
-PROJECT_SPEC.md
-```
-
-The handheld simulator runs on port `5174` and proxies its mobile API requests
-to the backend:
-
-```bash
+# Handheld simulator - http://localhost:5174
 pnpm --filter handheld-simulator dev
 ```
 
-The native client is in `apps/handheld-android`. Its
-[`README`](apps/handheld-android/README.md) documents JDK/Android SDK setup,
-emulator API configuration, build commands, tests, and the operator workflow.
+Swagger is available at `http://localhost:3000/api/docs`. Use
+`POST /bootstrap/admin` with `BOOTSTRAP_ADMIN_SECRET` to create the first
+administrator, then sign in at `http://localhost:5173/login`.
 
----
+### Verify the workspace
 
-# Documentation
-
-Complete engineering documentation is maintained under:
-
-```
-docs/
+```bash
+pnpm test
+pnpm test:e2e
+pnpm build
 ```
 
-Documentation covers:
+</details>
 
-- System Architecture
-- Database Design
-- Event Sourcing
-- Module Design
-- API Reference
-- Business Rules
-- Testing Strategy
-- Production Readiness
-- Development Roadmap
-- AI Development Guide
+## Repository map
 
----
+```text
+logistics-operations-platform/
+|-- apps/
+|   |-- backend/              NestJS API and Prisma schema
+|   |-- dashboard/            React operations dashboard
+|   |-- handheld-simulator/   Browser scanner simulator
+|   `-- handheld-android/     Native Android handheld
+|-- packages/
+|   `-- shared-types/         Shared domain and API contracts
+|-- infrastructure/docker/    Local PostgreSQL environment
+|-- docs/                     Architecture and module documentation
+`-- PROJECT_SPEC.md           Master engineering specification
+```
 
-# Project Goals
+## Documentation
 
-This repository is intended to demonstrate:
+- [Master engineering specification](PROJECT_SPEC.md)
+- [API reference](docs/04-api/37-api-reference.md)
+- [Handheld module](docs/02-modules/handheld-module.md)
+- [Android architecture and implementation plan](docs/ANDROID_HANDHELD_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md)
+- [Native Android setup and operator guide](apps/handheld-android/README.md)
 
-- Enterprise backend architecture
-- Domain-driven design
-- Event-driven systems
-- Logistics operations modeling
-- Modern API development
-- Production-ready coding practices
-- Scalable software architecture
+## Why I built it
 
----
+This project demonstrates more than individual framework features. It brings
+together domain modeling, event-driven design, transactional consistency,
+offline synchronization, customer-facing projections, and multiple client
+experiences inside one coherent logistics system.
 
-# Future Roadmap
-
-Phase 1
-
-✅ Core Logistics Engine
-
----
-
-Phase 2
-
-- Users
-- Authentication
-- Terminals
-- Routes
-- Shipments
+It is designed to show how a complex business domain can be translated into
+software that is auditable, testable, and straightforward to extend.
 
 ---
 
-Phase 3
+<div align="center">
 
-- Kafka
-- Notifications
-- Analytics
-- Reporting
+Built as a hands-on exploration of modern logistics software architecture.
 
----
+[View the specification](PROJECT_SPEC.md) | [Explore the API](docs/04-api/37-api-reference.md) | [Open an issue](https://github.com/Sukh-sudo/logistics-operations-platform/issues)
 
-Phase 4
-
-- React Dashboard
-- Mobile Scanner
-- GIS Integration
-- Machine Learning
-- Predictive Analytics
-
----
-
-# License
-
-This project is intended for educational, portfolio, and professional development purposes.
+</div>

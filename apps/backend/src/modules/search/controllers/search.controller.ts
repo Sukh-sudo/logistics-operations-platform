@@ -1,8 +1,11 @@
 import {Controller, Get, Param, Query,} from '@nestjs/common';
 import { SearchService } from '../services/search.service';
 import { SearchQueryDto } from '../dto/search-query.dto';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @Controller('search')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class SearchController {
   constructor(
     private readonly searchService: SearchService,

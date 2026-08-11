@@ -6,14 +6,18 @@ import { UnloadContainerDto } from '../dto/unload-container.dto';
 import { LoadPackageDto } from '../dto/load-package.dto';
 import { UnloadPackageDto } from '../dto/unload-package.dto';
 import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @Controller('trailers')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class TrailerController {
   constructor(
     private readonly trailerService: TrailerService,
   ) {}
 
   @Post()
+  @Permissions(PERMISSIONS.TRAILER_CREATE)
   createTrailer(
     @Body() dto: CreateTrailerDto,
     @Req() req: RequestWithId,
@@ -22,6 +26,7 @@ export class TrailerController {
   }
 
   @Post(':trailerId/close')
+  @Permissions(PERMISSIONS.TRAILER_DEPART)
   closeTrailer(
     @Param('trailerId') trailerId: string,
     @Req() req: RequestWithId,
@@ -33,6 +38,7 @@ export class TrailerController {
   }
 
   @Post(':trailerId/load-container')
+  @Permissions(PERMISSIONS.TRAILER_LOAD)
 loadContainer(
   @Param('trailerId') trailerId: string,
   @Body() dto: LoadContainerDto,
@@ -58,7 +64,8 @@ unloadContainer(
   );
 }
 
-@Post(':trailerId/load-package')
+  @Post(':trailerId/load-package')
+  @Permissions(PERMISSIONS.TRAILER_LOAD)
 loadPackage(
   @Param('trailerId') trailerId: string,
   @Body() dto: LoadPackageDto,

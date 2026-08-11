@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   Injectable,
   NotFoundException,
@@ -106,6 +107,10 @@ export class HandheldService implements OnModuleInit, OnModuleDestroy {
       });
       if (!employee?.snapshot || employee.primaryTerminalId === null) {
         throw new BadRequestException('Employee requires a permanent terminal');
+      }
+      const taskCategory = this.taskCategory(dto.taskType);
+      if (!this.authorizedTasks(employee.snapshot.roleNames).includes(taskCategory)) {
+        throw new ForbiddenException('Employee is not authorized for this task');
       }
       const session = await tx.handheldTaskSession.create({
         data: {
@@ -922,13 +927,40 @@ export class HandheldService implements OnModuleInit, OnModuleDestroy {
 
   private authorizedTasks(roles: string[]) {
     const normalized = roles.map((role) => role.toUpperCase());
-    if (normalized.includes('ADMIN') || normalized.includes('SUPERVISOR')) {
+    if (
+      normalized.some((role) =>
+        [
+          'ADMIN',
+          'ADMINISTRATOR',
+          'OPERATIONS_MANAGER',
+          'TERMINAL_MANAGER',
+          'SUPERVISOR',
+        ].includes(role),
+      )
+    ) {
       return ['TRAILER_OPERATIONS', 'LAST_MILE_LOADING', 'COURIER_DELIVERY'];
     }
     if (normalized.includes('DRIVER') || normalized.includes('COURIER')) {
       return ['LAST_MILE_LOADING', 'COURIER_DELIVERY'];
     }
-    return ['TRAILER_OPERATIONS', 'LAST_MILE_LOADING'];
+    if (
+      normalized.includes('DOCK_LEAD') ||
+      normalized.includes('FORKLIFT_OPERATOR')
+    ) {
+      return ['TRAILER_OPERATIONS', 'LAST_MILE_LOADING'];
+    }
+    if (normalized.includes('DISPATCHER')) return ['LAST_MILE_LOADING'];
+    return [];
+  }
+
+  private taskCategory(taskType: HandheldTaskType) {
+    if (taskType === HandheldTaskType.COURIER_DELIVERY) {
+      return 'COURIER_DELIVERY';
+    }
+    if (taskType === HandheldTaskType.LAST_MILE_LOADING) {
+      return 'LAST_MILE_LOADING';
+    }
+    return 'TRAILER_OPERATIONS';
   }
 
   private isUniqueViolation(error: unknown) {

@@ -2,8 +2,11 @@ import { Controller, Get } from '@nestjs/common';
 import { TripStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { MetricsService } from './metrics.service';
+import { PERMISSIONS } from '../../modules/authorization/constants/permissions';
+import { Permissions } from '../../modules/authorization/decorators/permissions.decorator';
 
 @Controller('metrics')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class MetricsController {
   constructor(
     private readonly metrics: MetricsService,

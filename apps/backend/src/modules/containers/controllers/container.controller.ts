@@ -4,14 +4,18 @@ import { CreateContainerDto } from '../dto/create-container.dto';
 import { LoadPackageDto } from '../dto/load-package.dto';
 import { ContainerService } from '../services/container.service';
 import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
+import { Permissions } from '../../authorization/decorators/permissions.decorator';
 
 @Controller('containers')
+@Permissions(PERMISSIONS.SYSTEM_ADMIN)
 export class ContainerController {
   constructor(
     private readonly containerService: ContainerService,
   ) {}
 
   @Post()
+  @Permissions(PERMISSIONS.CONTAINER_CREATE)
   createContainer(
     @Body() dto: CreateContainerDto,
     @Req() req: RequestWithId,
@@ -31,6 +35,7 @@ export class ContainerController {
   }
 
   @Post(':containerId/load-package')
+  @Permissions(PERMISSIONS.CONTAINER_LOAD)
   loadPackage(
     @Param('containerId') containerId: string,
     @Body() dto: LoadPackageDto,
@@ -44,6 +49,7 @@ export class ContainerController {
   }
 
   @Post(':containerId/unload-package')
+  @Permissions(PERMISSIONS.CONTAINER_UNLOAD)
 unloadPackage(
   @Param('containerId') containerId: string,
   @Body() dto: LoadPackageDto,

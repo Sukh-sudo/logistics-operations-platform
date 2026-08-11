@@ -3,9 +3,11 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
 import { CreateWorkSessionDto } from '../dto/create-work-session.dto';
 import { HandheldService } from '../services/handheld.service';
+import { AllowAuthenticated } from '../../authorization/decorators/allow-authenticated.decorator';
 
 @ApiTags('Handheld work sessions')
 @Controller('api/mobile/v1/work-sessions')
+@AllowAuthenticated()
 export class WorkSessionController {
   constructor(private readonly handheld: HandheldService) {}
 

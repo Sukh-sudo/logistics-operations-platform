@@ -74,6 +74,16 @@ describe('Handheld transactional workflow (integration)', () => {
       status: UserStatus.ACTIVE,
     });
     employeeId = employee.user.id;
+    const handheldRole = await prisma.role.upsert({
+      where: { name: 'FORKLIFT_OPERATOR' },
+      update: {},
+      create: {
+        name: 'FORKLIFT_OPERATOR',
+        description: 'Authorized terminal handheld operator',
+      },
+    });
+    // Assign through the domain service so the user event and snapshot agree.
+    await users.assignRole(employeeId, handheldRole.id);
     await users.assignTerminal(employeeId, terminalId);
 
     trackingNumber = packageIdentifier();

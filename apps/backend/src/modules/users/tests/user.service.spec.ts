@@ -141,6 +141,24 @@ describe('UserService', () => {
     expect(result.snapshot).toMatchObject({ currentStatus: UserStatus.ACTIVE, roleNames: ['ADMIN'] });
   });
 
+  it('disables administrator bootstrap after the first user exists', async () => {
+    process.env.BOOTSTRAP_ADMIN_SECRET = 'test-bootstrap-secret';
+    tx.user.findFirst.mockResolvedValueOnce({ id: 'existing-user' });
+
+    await expect(
+      service.bootstrapAdmin({
+        bootstrapSecret: 'test-bootstrap-secret',
+        employeeNumber: 'admin-2',
+        email: 'admin-2@example.com',
+        firstName: 'Second',
+        lastName: 'Admin',
+        password: 'StrongPassword!2',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(tx.user.create).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate user identity values', async () => {
     tx.user.findFirst.mockResolvedValue({
       email: 'operator@example.com',

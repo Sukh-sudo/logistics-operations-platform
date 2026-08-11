@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { UserEventType, UserStatus } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
 
@@ -117,6 +117,23 @@ describe('AuthService', () => {
         metadata: expect.objectContaining({ client: 'HANDHELD' }),
       }),
     });
+  });
+
+  it('fails closed for legacy handheld credentials in production', async () => {
+    const previousNodeEnvironment = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      await expect(
+        service.loginHandheld({
+          badgeBarcode: 'BADGE-1001',
+          employeeId: 'EMP-1001',
+          deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+        }),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(tx.user.findUnique).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = previousNodeEnvironment;
+    }
   });
 
   it('rotates a valid refresh token and records the event atomically', async () => {

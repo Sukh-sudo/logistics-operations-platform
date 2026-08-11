@@ -5,6 +5,7 @@ import {
   HandheldSessionState,
   HandheldTaskType,
 } from '@prisma/client';
+import { ForbiddenException } from '@nestjs/common';
 import { HandheldService } from '../services/handheld.service';
 
 describe('HandheldService', () => {
@@ -47,7 +48,7 @@ describe('HandheldService', () => {
     tx.user.findUnique.mockResolvedValue({
       id: 'employee-1',
       primaryTerminalId: 10,
-      snapshot: { currentState: 'ACTIVE' },
+      snapshot: { currentState: 'ACTIVE', roleNames: ['FORKLIFT_OPERATOR'] },
     });
     tx.handheldTaskSession.create.mockResolvedValue({
       id: 'session-1',
@@ -76,6 +77,23 @@ describe('HandheldService', () => {
       data: expect.objectContaining({ taskSessionId: 'session-1' }),
     });
     expect(result.snapshot.currentState).toBe(HandheldSessionState.ACTIVE);
+  });
+
+  it('rejects task sessions outside the employee role catalog', async () => {
+    tx.user.findUnique.mockResolvedValue({
+      id: 'employee-1',
+      primaryTerminalId: 10,
+      snapshot: { currentState: 'ACTIVE', roleNames: ['VIEWER'] },
+    });
+
+    await expect(
+      service.startSession('employee-1', {
+        deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+        taskType: HandheldTaskType.TRAILER_LOAD,
+        networkState: HandheldNetworkState.ONLINE,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tx.handheldTaskSession.create).not.toHaveBeenCalled();
   });
 
   it('returns the original accepted result as duplicate without executing the domain command', async () => {
