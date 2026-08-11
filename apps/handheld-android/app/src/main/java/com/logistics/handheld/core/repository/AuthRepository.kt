@@ -2,6 +2,7 @@ package com.logistics.handheld.core.repository
 
 import androidx.room.withTransaction
 import com.logistics.handheld.core.auth.TokenStore
+import com.logistics.handheld.core.auth.DeviceCredentialStore
 import com.logistics.handheld.core.database.BootstrapDao
 import com.logistics.handheld.core.database.HandheldDatabase
 import com.logistics.handheld.core.database.TaskSessionDao
@@ -18,6 +19,7 @@ import javax.inject.Singleton
 class AuthRepository @Inject constructor(
     private val api: HandheldApi,
     private val tokens: TokenStore,
+    private val deviceCredentials: DeviceCredentialStore,
     private val devicePreferences: DevicePreferences,
     private val network: NetworkMonitor,
     private val database: HandheldDatabase,
@@ -26,13 +28,26 @@ class AuthRepository @Inject constructor(
 ) {
     fun hasAuthenticatedShift() = tokens.read() != null
 
+    fun isDeviceEnrolled() = deviceCredentials.read() != null
+
+    suspend fun deviceId() = devicePreferences.installationId()
+
+    fun saveDeviceCredential(credential: String) {
+        require(credential.trim().length >= 32) { "Enter the complete enrollment credential." }
+        deviceCredentials.save(credential)
+    }
+
     suspend fun login(badge: String, employeeNumber: String): Bootstrap {
         check(network.currentlyOnline()) { "First login requires a network connection." }
+        val deviceCredential = checkNotNull(deviceCredentials.read()) {
+            "This device must be enrolled before an employee can sign in."
+        }
         val response = api.login(
             LoginRequest(
                 badge.trim().uppercase(),
                 employeeNumber.trim().uppercase(),
                 devicePreferences.installationId(),
+                deviceCredential,
             ),
         ).data
         tokens.save(response.accessToken, response.refreshToken)

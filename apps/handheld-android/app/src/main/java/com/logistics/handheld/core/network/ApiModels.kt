@@ -13,6 +13,7 @@ data class LoginRequest(
     val badgeBarcode: String,
     val employeeId: String,
     val deviceId: String,
+    val deviceCredential: String,
 )
 
 @JsonClass(generateAdapter = false)

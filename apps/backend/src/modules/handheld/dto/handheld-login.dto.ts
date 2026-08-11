@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class HandheldLoginDto {
   @ApiProperty({ example: 'EMP-BADGE-12345' })
@@ -17,4 +17,13 @@ export class HandheldLoginDto {
   @ApiProperty({ example: '8c808770-d3c8-4891-8382-f700e919aec3' })
   @IsUUID()
   deviceId: string;
+
+  @ApiProperty({
+    description: 'Provisioned device secret supplied automatically by the client',
+    writeOnly: true,
+  })
+  @IsString()
+  @MinLength(32)
+  @MaxLength(128)
+  deviceCredential: string;
 }

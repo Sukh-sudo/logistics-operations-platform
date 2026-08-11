@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import {
   HandheldAction,
+  HandheldDevicePlatform,
   HandheldNetworkState,
   HandheldResultStatus,
   HandheldTaskType,
@@ -14,6 +15,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { HandheldService } from '../src/modules/handheld/services/handheld.service';
+import { HandheldDeviceService } from '../src/modules/handheld/services/handheld-device.service';
 import { ContainerService } from '../src/modules/containers/services/container.service';
 import { FleetService } from '../src/modules/fleet/services/fleet.service';
 import { PackageService } from '../src/modules/packages/services/package.service';
@@ -39,6 +41,8 @@ describe('Handheld transactional workflow (integration)', () => {
   let trailerBarcode: string;
   let badgeBarcode: string;
   let employeeNumber: string;
+  let deviceCredential: string;
+  let deviceId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule =
@@ -48,6 +52,7 @@ describe('Handheld transactional workflow (integration)', () => {
 
     prisma = app.get(PrismaService);
     handheld = app.get(HandheldService);
+    const devices = app.get(HandheldDeviceService);
     const terminals = app.get(TerminalService);
     const users = app.get(UserService);
     const packages = app.get(PackageService);
@@ -99,9 +104,20 @@ describe('Handheld transactional workflow (integration)', () => {
     });
     trailerBarcode = trailerIdentifier();
     await trailers.createTrailer({ trailerBarcode, terminalId });
+    deviceId = randomUUID();
+
+    const enrollment = await devices.enroll(
+      {
+        deviceId,
+        displayName: `Integration handheld ${suffix}`,
+        platform: HandheldDevicePlatform.SIMULATOR,
+      },
+      employeeId,
+    );
+    deviceCredential = enrollment.credential;
 
     const session = await handheld.startSession(employeeId, {
-      deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+      deviceId,
       taskType: HandheldTaskType.TRAILER_LOAD,
       networkState: HandheldNetworkState.ONLINE,
     });
@@ -114,13 +130,23 @@ describe('Handheld transactional workflow (integration)', () => {
       .send({
         badgeBarcode,
         employeeId: employeeNumber,
-        deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+        deviceId,
+        deviceCredential,
       })
       .expect(201);
 
     expect(response.body.accessToken).toBeDefined();
     expect(response.body.employee.id).toBe(employeeId);
     expect(response.body.terminal.id).toBe(terminalId);
+    const device = await prisma.handheldDevice.findUniqueOrThrow({
+      where: { deviceId },
+      include: { snapshot: true, events: true },
+    });
+    expect(device.credentialHash).not.toBe(deviceCredential);
+    expect(device.snapshot?.lastAuthenticatedAt).not.toBeNull();
+    expect(device.events.map(({ eventType }) => eventType)).toEqual(
+      expect.arrayContaining(['DEVICE_ENROLLED', 'DEVICE_AUTHENTICATED']),
+    );
   });
 
   afterAll(async () => {
@@ -132,7 +158,7 @@ describe('Handheld transactional workflow (integration)', () => {
       taskSessionId: sessionId,
       clientEventId: randomUUID(),
       action: HandheldAction.LOAD_PACKAGE_TO_TRAILER,
-      deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+      deviceId,
       deviceTimestamp: new Date().toISOString(),
       networkStateAtCapture: HandheldNetworkState.ONLINE,
       trackingNumber,
@@ -174,7 +200,7 @@ describe('Handheld transactional workflow (integration)', () => {
       terminalId,
     });
     const closeSession = await handheld.startSession(employeeId, {
-      deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+      deviceId,
       taskType: HandheldTaskType.CONTAINER_LOAD,
       networkState: HandheldNetworkState.ONLINE,
     });
@@ -182,7 +208,7 @@ describe('Handheld transactional workflow (integration)', () => {
       taskSessionId: closeSession.session.id,
       clientEventId: randomUUID(),
       action: HandheldAction.CLOSE_CONTAINER,
-      deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+      deviceId,
       deviceTimestamp: new Date().toISOString(),
       networkStateAtCapture: HandheldNetworkState.ONLINE,
       containerBarcode: created.snapshot.containerBarcode,
@@ -191,7 +217,7 @@ describe('Handheld transactional workflow (integration)', () => {
       taskSessionId: sessionId,
       clientEventId: randomUUID(),
       action: HandheldAction.LOAD_CONTAINER_TO_TRAILER,
-      deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+      deviceId,
       deviceTimestamp: new Date().toISOString(),
       networkStateAtCapture: HandheldNetworkState.ONLINE,
       containerBarcode: created.snapshot.containerBarcode,
@@ -242,13 +268,13 @@ describe('Handheld transactional workflow (integration)', () => {
       terminalId,
     });
     const lastMileSession = await handheld.startSession(employeeId, {
-      deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+      deviceId,
       taskType: HandheldTaskType.LAST_MILE_LOADING,
       networkState: HandheldNetworkState.ONLINE,
     });
     const base = {
       taskSessionId: lastMileSession.session.id,
-      deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+      deviceId,
       deviceTimestamp: new Date().toISOString(),
       networkStateAtCapture: HandheldNetworkState.ONLINE,
       trackingNumber: packageNumber,

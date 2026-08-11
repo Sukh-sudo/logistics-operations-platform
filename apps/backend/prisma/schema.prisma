@@ -526,15 +526,18 @@ model UserSnapshot {
 }
 
 model RefreshToken {
-  id        String    @id @default(cuid())
-  userId    String
-  tokenHash String    @unique
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id])
+  id               String          @id @default(cuid())
+  userId           String
+  handheldDeviceId String?
+  tokenHash        String          @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime        @default(now())
+  user             User            @relation(fields: [userId], references: [id])
+  handheldDevice   HandheldDevice? @relation(fields: [handheldDeviceId], references: [id])
 
   @@index([userId, revokedAt])
+  @@index([handheldDeviceId, revokedAt])
   @@index([expiresAt])
 }
 
@@ -731,6 +734,52 @@ model HandheldTaskSession {
   @@index([employeeId, createdAt])
   @@index([terminalId, createdAt])
   @@index([deviceId, createdAt])
+}
+
+// A managed handheld device has its own auditable lifecycle. The credential
+// hash is technical authentication material and is never copied into events or
+// snapshots, so an event export cannot be used to impersonate a device.
+model HandheldDevice {
+  id             String                   @id @default(cuid())
+  deviceId       String                   @unique
+  credentialHash String
+  createdAt      DateTime                 @default(now())
+  events         HandheldDeviceEvent[]
+  snapshot       HandheldDeviceSnapshot?
+  refreshTokens  RefreshToken[]
+}
+
+model HandheldDeviceEvent {
+  id               String                  @id @default(cuid())
+  handheldDeviceId String
+  eventType        HandheldDeviceEventType
+  actorUserId      String?
+  correlationId    String
+  payload          Json?
+  createdAt        DateTime                @default(now())
+  handheldDevice   HandheldDevice          @relation(fields: [handheldDeviceId], references: [id], onDelete: Restrict)
+
+  @@index([handheldDeviceId, createdAt])
+  @@index([correlationId])
+}
+
+// Administrative reads use this projection instead of deriving current device
+// state by replaying lifecycle events on every request.
+model HandheldDeviceSnapshot {
+  id                  String               @id
+  deviceId            String               @unique
+  displayName         String
+  platform            HandheldDevicePlatform
+  currentStatus       HandheldDeviceStatus @default(ACTIVE)
+  enrolledAt          DateTime
+  revokedAt           DateTime?
+  lastAuthenticatedAt DateTime?
+  lastActivityAt      DateTime
+  updatedAt           DateTime             @updatedAt
+  handheldDevice      HandheldDevice       @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@index([currentStatus, updatedAt])
+  @@index([platform, currentStatus])
 }
 
 model HandheldTaskSessionEvent {
@@ -1107,6 +1156,23 @@ enum HandheldTaskType {
   CONTAINER_UNLOAD
   LAST_MILE_LOADING
   COURIER_DELIVERY
+}
+
+enum HandheldDevicePlatform {
+  ANDROID
+  SIMULATOR
+}
+
+enum HandheldDeviceStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum HandheldDeviceEventType {
+  DEVICE_ENROLLED
+  DEVICE_AUTHENTICATED
+  DEVICE_TOKEN_REFRESHED
+  DEVICE_REVOKED
 }
 
 enum HandheldSessionState {

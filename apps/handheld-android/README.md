@@ -6,8 +6,9 @@ implements the architecture in
 
 ## Implemented workflows
 
-- Online badge and employee-number login with Android Keystore-backed token
-  encryption and cached bootstrap context for an authenticated offline shift.
+- Administrator-managed device enrollment plus online badge and
+  employee-number login. Device credentials and session tokens use separate
+  Android Keystore-backed encrypted stores.
 - Authorized trailer load/unload, container load/unload, last-mile loading, and
   courier delivery task sessions.
 - CameraX and ML Kit barcode capture behind a scanner interface, continuous
@@ -62,17 +63,20 @@ the local database version changes.
 
 ## Operator walkthrough
 
-1. Start the backend and sign in by scanning a badge and entering the employee
-   number.
-2. Select an authorized task. New sessions require connectivity; an existing
+1. On first launch, give the displayed Device ID to an administrator. The
+   administrator enrolls it with `POST /handheld-devices` and securely returns
+   the one-time credential. Enter and save that credential on the device.
+2. Sign in normally by scanning a badge and entering the employee number. The
+   stored device proof is sent automatically.
+3. Select an authorized task. New sessions require connectivity; an existing
    authenticated session can be resumed offline.
-3. Establish the trailer or route/truck context shown on the work screen.
-4. Choose an action and scan. Paired container workflows scan the package and
+4. Establish the trailer or route/truck context shown on the work screen.
+5. Choose an action and scan. Paired container workflows scan the package and
    then its container.
-5. Continue scanning; every command is saved to Room before transport.
-6. Open History to see pending or server-resolved results, retry sync, dismiss
+6. Continue scanning; every command is saved to Room before transport.
+7. Open History to see pending or server-resolved results, retry sync, dismiss
    rejected items, or create a compensating reversal.
-7. Synchronize pending work before completing a task session.
+8. Synchronize pending work before completing a task session.
 
 The app requests camera permission when scanning and fine-location permission
 for courier actions. A declined GPS request does not block capture; the server

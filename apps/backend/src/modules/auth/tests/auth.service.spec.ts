@@ -1,5 +1,11 @@
-import { ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
-import { UserEventType, UserStatus } from '@prisma/client';
+import { UnauthorizedException } from '@nestjs/common';
+import {
+  HandheldDeviceEventType,
+  HandheldDeviceStatus,
+  UserEventType,
+  UserStatus,
+} from '@prisma/client';
+import { createHash } from 'crypto';
 import { AuthService } from '../services/auth.service';
 
 describe('AuthService', () => {
@@ -33,6 +39,9 @@ describe('AuthService', () => {
     },
     userEvent: { create: jest.fn() },
     userSnapshot: { update: jest.fn() },
+    handheldDevice: { findUnique: jest.fn() },
+    handheldDeviceEvent: { create: jest.fn() },
+    handheldDeviceSnapshot: { update: jest.fn() },
   };
   const prisma = { $transaction: jest.fn((callback) => callback(tx)) };
   const jwt = { signAsync: jest.fn().mockResolvedValue('access-token') };
@@ -47,6 +56,12 @@ describe('AuthService', () => {
     service = new AuthService(prisma as never, jwt as never, credentials as never);
     tx.user.findUnique.mockResolvedValue(user);
     tx.userEvent.create.mockResolvedValue({ createdAt: new Date() });
+    tx.handheldDevice.findUnique.mockResolvedValue({
+      id: 'device-aggregate-1',
+      credentialHash: createHash('sha256').update('d'.repeat(43)).digest('hex'),
+      snapshot: { currentStatus: HandheldDeviceStatus.ACTIVE },
+    });
+    tx.handheldDeviceEvent.create.mockResolvedValue({ createdAt: new Date() });
   });
 
   it('logs in an active user and atomically persists the session, event, and snapshot', async () => {
@@ -101,6 +116,7 @@ describe('AuthService', () => {
       badgeBarcode: ' badge-1001 ',
       employeeId: ' emp-1001 ',
       deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+      deviceCredential: 'd'.repeat(43),
     });
 
     expect(tx.user.findUnique).toHaveBeenCalledWith({
@@ -117,23 +133,28 @@ describe('AuthService', () => {
         metadata: expect.objectContaining({ client: 'HANDHELD' }),
       }),
     });
+    expect(tx.handheldDeviceEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        handheldDeviceId: 'device-aggregate-1',
+        eventType: HandheldDeviceEventType.DEVICE_AUTHENTICATED,
+      }),
+    });
+    expect(tx.refreshToken.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ handheldDeviceId: 'device-aggregate-1' }),
+    });
   });
 
-  it('fails closed for legacy handheld credentials in production', async () => {
-    const previousNodeEnvironment = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
-    try {
-      await expect(
-        service.loginHandheld({
-          badgeBarcode: 'BADGE-1001',
-          employeeId: 'EMP-1001',
-          deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
-        }),
-      ).rejects.toBeInstanceOf(ServiceUnavailableException);
-      expect(tx.user.findUnique).not.toHaveBeenCalled();
-    } finally {
-      process.env.NODE_ENV = previousNodeEnvironment;
-    }
+  it('rejects a handheld login from an unenrolled device', async () => {
+    tx.handheldDevice.findUnique.mockResolvedValue(null);
+    await expect(
+      service.loginHandheld({
+        badgeBarcode: 'BADGE-1001',
+        employeeId: 'EMP-1001',
+        deviceId: '8c808770-d3c8-4891-8382-f700e919aec3',
+        deviceCredential: 'x'.repeat(43),
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(tx.refreshToken.create).not.toHaveBeenCalled();
   });
 
   it('rotates a valid refresh token and records the event atomically', async () => {
@@ -142,6 +163,8 @@ describe('AuthService', () => {
       revokedAt: null,
       expiresAt: new Date(Date.now() + 60_000),
       user,
+      handheldDeviceId: null,
+      handheldDevice: null,
     });
 
     await service.refresh('a'.repeat(64));

@@ -4,6 +4,7 @@ export interface AuthenticatedUser {
   roles: string[];
   permissions: string[];
   tokenVersion: number;
+  handheldDeviceId?: string;
 }
 
 export interface AccessTokenPayload {
@@ -13,4 +14,5 @@ export interface AccessTokenPayload {
   permissions: string[];
   tokenVersion: number;
   type: 'access';
+  handheldDeviceId?: string;
 }

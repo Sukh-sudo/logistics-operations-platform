@@ -461,6 +461,16 @@ label > span { display: block; margin-bottom: 6px; color: #56645d; font-size: 10
 .login-panel h2 { margin-top: 8px; font-size: 32px; letter-spacing: -.04em; }
 .login-panel .muted { margin-top: 8px; font-size: 12px; line-height: 1.5; }
 .login-form { margin-top: 30px; display: grid; gap: 17px; }
+.device-enrollment {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #d8e0dc;
+  border-radius: 10px;
+  background: #f7faf8;
+}
+.device-enrollment code { overflow-wrap: anywhere; font-size: 11px; }
+.link-button { border: 0; background: transparent; color: #365749; cursor: pointer; text-align: left; }
 .login-form input { height: 49px; font-size: 13px; }
 .field-with-icon { position: relative; }
 .field-with-icon svg { position: absolute; left: 14px; top: 14px; width: 20px; color: #819087; }

@@ -85,10 +85,15 @@ async function authorized<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const handheldApi = {
-  login: (badgeBarcode: string, employeeId: string, deviceId: string) =>
+  login: (
+    badgeBarcode: string,
+    employeeId: string,
+    deviceId: string,
+    deviceCredential: string,
+  ) =>
     rawRequest<LoginResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ badgeBarcode, employeeId, deviceId }),
+      body: JSON.stringify({ badgeBarcode, employeeId, deviceId, deviceCredential }),
     }),
   bootstrap: () => authorized<Bootstrap>('/bootstrap'),
   logout: (refreshToken: string) =>

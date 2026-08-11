@@ -56,6 +56,9 @@ Before implementation begins, verify the actual route names, DTOs, enums, Prisma
 
 - Initial users are employees and courier drivers.
 - The employee scans a badge and enters an employee ID.
+- The installation must first be enrolled by an administrator. A one-time
+  device credential is stored with Android Keystore-backed encryption and is
+  supplied automatically; it does not add an operator login field each shift.
 - No password is required for the portfolio version.
 - The first login must occur online.
 - An authenticated shift may continue while the device is offline.
@@ -373,7 +376,8 @@ Login request:
 {
   "badgeBarcode": "EMP-BADGE-12345",
   "employeeId": "12345",
-  "deviceId": "installation-uuid"
+  "deviceId": "installation-uuid",
+  "deviceCredential": "stored-and-supplied-automatically"
 }
 ```
 
@@ -666,8 +670,8 @@ Do not average individual employee PPH values. Aggregating numerator and denomin
 
 1. Scan employee badge.
 2. Enter employee ID.
-3. Submit while online.
-4. Backend validates the matching employee.
+3. The app automatically adds its enrolled-device proof and submits online.
+4. Backend validates both the active device and matching employee.
 5. App receives JWT, employee role, terminal, and authorized tasks.
 6. App opens the task-based home screen.
 
@@ -1151,7 +1155,8 @@ Complete supervisor visibility, productivity reporting, system hardening, and po
 - Store JWTs using Android Keystore-backed encryption.
 - Never log JWTs, employee identifiers unnecessarily, or full GPS payloads in debug analytics.
 - Enforce terminal and role rules on the backend.
-- Treat badge plus employee ID as portfolio authentication and document the production limitation.
+- Bind badge plus employee-ID authentication to an active managed device and
+  invalidate access and refresh sessions when that device is revoked.
 
 ### Auditability
 
@@ -1180,7 +1185,7 @@ The following are explicitly outside the initial four phases:
 - Delivery photograph.
 - Recipient name and notes.
 - Supervisor approval workflows.
-- Remote device registration or device management.
+- Full MDM-driven remote device registration and credential delivery.
 - Maps and route navigation.
 - Full production MDM deployment.
 - Advanced event replay and Kafka operations tooling.

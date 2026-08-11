@@ -7,6 +7,7 @@ import type {
 
 const KEYS = {
   installation: 'handheld.installation-id',
+  deviceCredential: 'handheld.device-credential',
   tokens: 'handheld.tokens',
   bootstrap: 'handheld.bootstrap',
   outbox: 'handheld.outbox',
@@ -37,6 +38,14 @@ export const tokenStorage = {
   get: () => readJson<AuthTokens>(KEYS.tokens),
   set: (tokens: AuthTokens) => localStorage.setItem(KEYS.tokens, JSON.stringify(tokens)),
   clear: () => localStorage.removeItem(KEYS.tokens),
+};
+
+// The browser simulator is a development client; native Android uses
+// Keystore-backed encrypted preferences for this same enrollment secret.
+export const deviceCredentialStorage = {
+  get: () => localStorage.getItem(KEYS.deviceCredential),
+  set: (credential: string) =>
+    localStorage.setItem(KEYS.deviceCredential, credential.trim()),
 };
 
 export const bootstrapStorage = {

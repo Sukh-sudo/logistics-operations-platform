@@ -39,6 +39,10 @@ data class HandheldUiState(
     val pairedContainerBarcode: String = "",
     val badge: String = "",
     val employeeNumber: String = "",
+    val deviceId: String = "",
+    val deviceCredential: String = "",
+    val deviceEnrolled: Boolean = false,
+    val configuringDevice: Boolean = false,
     val lookupInput: String = "",
     val packageSummary: PackageSummary? = null,
     val scannerTarget: ScannerTarget? = null,
@@ -86,9 +90,25 @@ class HandheldViewModel @Inject constructor(
 
     fun setBadge(value: String) = mutableState.update { it.copy(badge = value) }
     fun setEmployeeNumber(value: String) = mutableState.update { it.copy(employeeNumber = value) }
+    fun setDeviceCredential(value: String) = mutableState.update { it.copy(deviceCredential = value) }
     fun setIdentifier(value: String) = mutableState.update { it.copy(identifier = value) }
     fun setContainer(value: String) = mutableState.update { it.copy(pairedContainerBarcode = value) }
     fun setLookup(value: String) = mutableState.update { it.copy(lookupInput = value) }
+
+    fun configureDevice() = mutableState.update { it.copy(configuringDevice = true) }
+
+    fun saveDeviceEnrollment() = runBusy {
+        val credential = mutableState.value.deviceCredential
+        auth.saveDeviceCredential(credential)
+        mutableState.update {
+            it.copy(
+                deviceCredential = "",
+                deviceEnrolled = true,
+                configuringDevice = false,
+                notice = "Device credential stored securely.",
+            )
+        }
+    }
 
     fun setContext(context: OperationalContext) {
         mutableState.update { it.copy(context = context) }
@@ -127,7 +147,13 @@ class HandheldViewModel @Inject constructor(
 
     fun logout() = runBusy {
         auth.logout()
-        mutableState.value = HandheldUiState(online = mutableState.value.online, busy = false)
+        val current = mutableState.value
+        mutableState.value = HandheldUiState(
+            online = current.online,
+            deviceId = current.deviceId,
+            deviceEnrolled = current.deviceEnrolled,
+            busy = false,
+        )
     }
 
     fun openTask(taskType: TaskType) = runBusy {
@@ -290,9 +316,14 @@ class HandheldViewModel @Inject constructor(
     }
 
     private fun loadAuthenticatedShift() = runBusy {
+        val deviceId = auth.deviceId()
+        val deviceEnrolled = auth.isDeviceEnrolled()
         val bootstrap = auth.bootstrap()
         mutableState.update {
             it.copy(
+                deviceId = deviceId,
+                deviceEnrolled = deviceEnrolled,
+                configuringDevice = !deviceEnrolled,
                 bootstrap = bootstrap,
                 activeSessions = bootstrap?.activeSessions.orEmpty(),
                 route = if (bootstrap == null) HandheldRoute.LOGIN else HandheldRoute.HOME,

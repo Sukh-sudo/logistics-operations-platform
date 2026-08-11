@@ -9,9 +9,10 @@ authoritative package, container, and trailer rules to their existing services.
 
 ## Implemented server contract
 
-- Badge barcode plus employee-number login and normal JWT issuance for
-  non-production portfolio environments. Production fails closed pending a
-  stronger authentication decision.
+- Managed-device enrollment with one-time credentials, hashed server-side,
+  event-driven enrollment/revocation, and snapshot-backed administration.
+- Badge barcode plus employee-number operator login with an automatic device
+  possession proof and device-bound JWT/refresh sessions.
 - Permanent-terminal bootstrap with authorized task categories and thresholds.
 - Event-driven task sessions with a rebuildable snapshot and auditable active
   intervals.
@@ -50,6 +51,10 @@ without executing the aggregate service again.
 - `HandheldTaskSessionSnapshot` is the current session read model.
 - `HandheldCommandReceipt` is the idempotency and device-accountability record.
 - `HandheldTaskInterval` provides reproducible active-time and PPH calculations.
+- `HandheldDeviceEvent` is authoritative for enrollment, authentication, token
+  refresh, and revocation history.
+- `HandheldDeviceSnapshot` is the administrative device-status read model;
+  credentials are deliberately excluded from both events and snapshots.
 
 ## Operational configuration
 
@@ -65,6 +70,8 @@ client for this module. It is a responsive React/Vite application that:
 
 - Authenticates with badge and employee number and caches terminal bootstrap
   context for an already authenticated offline shift.
+- Accepts a one-time enrollment credential for a matching installation ID and
+  automatically supplies it on later operator logins.
 - Starts, resumes, pauses, and completes server task sessions.
 - Presents trailer, container, last-mile, and courier workflows.
 - Saves every operational command to a local outbox before attempting network
@@ -86,6 +93,8 @@ for demos but is not presented as secure production device storage.
 
 - CameraX/ML Kit barcode capture behind a scanner interface with manual entry.
 - Android Keystore-backed token encryption and terminal bootstrap caching.
+- Separate Keystore-backed device enrollment credential storage that survives
+  employee logout.
 - Room task-session/package snapshots and a persist-before-send event outbox.
 - WorkManager synchronization in device capture order.
 - Trailer, container, last-mile, and courier workflows with session controls.

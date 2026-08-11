@@ -28,6 +28,7 @@ import {
   bootstrapStorage,
   clearAuthentication,
   contextStorage,
+  deviceCredentialStorage,
   installationId,
   outboxStorage,
   tokenStorage,
@@ -57,6 +58,9 @@ export function App() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [deviceEnrolled, setDeviceEnrolled] = useState(
+    () => deviceCredentialStorage.get() !== null,
+  );
 
   useEffect(() => {
     const wentOnline = () => setOnline(true);
@@ -96,7 +100,14 @@ export function App() {
     setBusy(true);
     setError('');
     try {
-      const response = await handheldApi.login(badgeBarcode, employeeId, deviceId);
+      const deviceCredential = deviceCredentialStorage.get();
+      if (!deviceCredential) throw new Error('Enroll this simulator before signing in.');
+      const response = await handheldApi.login(
+        badgeBarcode,
+        employeeId,
+        deviceId,
+        deviceCredential,
+      );
       tokenStorage.set({
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
@@ -365,6 +376,13 @@ export function App() {
         online={online}
         submitting={busy}
         error={error}
+        deviceId={deviceId}
+        deviceEnrolled={deviceEnrolled}
+        onEnroll={(credential) => {
+          deviceCredentialStorage.set(credential);
+          setDeviceEnrolled(true);
+          setError('');
+        }}
         onSubmit={login}
       />
     );

@@ -1,10 +1,13 @@
 import { BadgeCheck, ScanLine, ShieldCheck } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 interface LoginScreenProps {
   online: boolean;
   submitting: boolean;
   error: string;
+  deviceId: string;
+  deviceEnrolled: boolean;
+  onEnroll: (credential: string) => void;
   onSubmit: (badgeBarcode: string, employeeId: string) => Promise<void>;
 }
 
@@ -12,10 +15,19 @@ export function LoginScreen({
   online,
   submitting,
   error,
+  deviceId,
+  deviceEnrolled,
+  onEnroll,
   onSubmit,
 }: LoginScreenProps) {
   const [badgeBarcode, setBadgeBarcode] = useState('');
   const [employeeId, setEmployeeId] = useState('');
+  const [deviceCredential, setDeviceCredential] = useState('');
+  const [configuringDevice, setConfiguringDevice] = useState(!deviceEnrolled);
+
+  useEffect(() => {
+    if (!deviceEnrolled) setConfiguringDevice(true);
+  }, [deviceEnrolled]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -47,6 +59,45 @@ export function LoginScreen({
         </div>
 
         <form onSubmit={submit} className="login-form">
+          <div className="device-enrollment">
+            <span>Device ID</span>
+            <code>{deviceId}</code>
+            {configuringDevice ? (
+              <>
+                <label>
+                  <span>One-time enrollment credential</span>
+                  <input
+                    required
+                    minLength={32}
+                    type="password"
+                    value={deviceCredential}
+                    onChange={(event) => setDeviceCredential(event.target.value)}
+                    autoComplete="new-password"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={deviceCredential.trim().length < 32}
+                  onClick={() => {
+                    onEnroll(deviceCredential);
+                    setDeviceCredential('');
+                    setConfiguringDevice(false);
+                  }}
+                >
+                  Save device enrollment
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => setConfiguringDevice(true)}
+              >
+                Device enrolled · Replace credential
+              </button>
+            )}
+          </div>
           <label>
             <span>Badge barcode</span>
             <div className="field-with-icon">
@@ -72,7 +123,10 @@ export function LoginScreen({
             />
           </label>
           {error && <div className="alert error" role="alert">{error}</div>}
-          <button className="primary-button" disabled={!online || submitting}>
+          <button
+            className="primary-button"
+            disabled={!online || submitting || !deviceEnrolled || configuringDevice}
+          >
             {submitting ? 'Authenticating…' : 'Authenticate & continue'}
           </button>
         </form>

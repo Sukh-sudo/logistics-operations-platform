@@ -1,12 +1,16 @@
 import {
   BadRequestException,
   Injectable,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UserEventType, UserStatus } from '@prisma/client';
-import { createHash, randomBytes, randomUUID } from 'crypto';
+import {
+  HandheldDeviceEventType,
+  HandheldDeviceStatus,
+  UserEventType,
+  UserStatus,
+} from '@prisma/client';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
@@ -73,28 +77,30 @@ export class AuthService {
     });
   }
 
-  /**
-   * Portfolio handheld authentication deliberately uses badge + employee
-   * number. It shares the normal JWT issuer so stronger authentication can be
-   * introduced later without changing downstream authorization.
-   */
+  /** Badge and employee number identify the operator; a provisioned device
+   * credential proves the login originated from an enrolled installation. */
   async loginHandheld(dto: HandheldLoginDto, requestId?: string) {
-    // Badge and employee number are portfolio identifiers, not independent
-    // authentication factors. Keep this legacy flow unavailable in production
-    // until PIN/password or managed-device enrollment is selected.
-    if (process.env.NODE_ENV === 'production') {
-      throw new ServiceUnavailableException(
-        'Production handheld authentication is not configured',
-      );
-    }
     const badgeBarcode = dto.badgeBarcode.trim().toUpperCase();
     const employeeNumber = dto.employeeId.trim().toUpperCase();
     return this.prisma.$transaction(async (tx) => {
+      const device = await tx.handheldDevice.findUnique({
+        where: { deviceId: dto.deviceId },
+        include: { snapshot: true },
+      });
       const current = await tx.user.findUnique({
         where: { badgeBarcode },
         include: { snapshot: true, primaryTerminal: true },
       });
+      // Always perform the same fixed-length comparison, including for an
+      // unknown device, so enrollment state is not exposed by an early return.
+      const deviceCredentialMatches = this.matchesCredential(
+        dto.deviceCredential,
+        device?.credentialHash ?? '0'.repeat(64),
+      );
       if (
+        !device?.snapshot ||
+        device.snapshot.currentStatus !== HandheldDeviceStatus.ACTIVE ||
+        !deviceCredentialMatches ||
         !current ||
         current.employeeNumber !== employeeNumber ||
         current.snapshot?.currentStatus !== UserStatus.ACTIVE ||
@@ -109,20 +115,37 @@ export class AuthService {
         current.tokenVersion,
         current.snapshot.roleNames,
         current.snapshot.permissions,
+        device.id,
       );
       await tx.refreshToken.create({ data: issued.refreshTokenRecord });
+      const correlationId = requestId ?? randomUUID();
       const event = await tx.userEvent.create({
         data: {
           userId: current.id,
           eventType: UserEventType.USER_AUTHENTICATED,
           actorUserId: current.id,
-          correlationId: requestId ?? randomUUID(),
+          correlationId,
           metadata: { client: 'HANDHELD', deviceId: dto.deviceId },
         },
       });
       await tx.userSnapshot.update({
         where: { userId: current.id },
         data: { lastLoginAt: event.createdAt, lastActivityAt: event.createdAt },
+      });
+      const deviceEvent = await tx.handheldDeviceEvent.create({
+        data: {
+          handheldDeviceId: device.id,
+          eventType: HandheldDeviceEventType.DEVICE_AUTHENTICATED,
+          actorUserId: current.id,
+          correlationId,
+        },
+      });
+      await tx.handheldDeviceSnapshot.update({
+        where: { id: device.id },
+        data: {
+          lastAuthenticatedAt: deviceEvent.createdAt,
+          lastActivityAt: deviceEvent.createdAt,
+        },
       });
 
       return {
@@ -148,14 +171,20 @@ export class AuthService {
     return this.prisma.$transaction(async (tx) => {
       const stored = await tx.refreshToken.findUnique({
         where: { tokenHash },
-        include: { user: { include: { snapshot: true } } },
+        include: {
+          user: { include: { snapshot: true } },
+          handheldDevice: { include: { snapshot: true } },
+        },
       });
       const now = new Date();
       if (
         !stored ||
         stored.revokedAt ||
         stored.expiresAt <= now ||
-        stored.user.snapshot?.currentStatus !== UserStatus.ACTIVE
+        stored.user.snapshot?.currentStatus !== UserStatus.ACTIVE ||
+        (stored.handheldDeviceId !== null &&
+          stored.handheldDevice?.snapshot?.currentStatus !==
+            HandheldDeviceStatus.ACTIVE)
       ) {
         throw new UnauthorizedException('Invalid refresh token');
       }
@@ -171,6 +200,7 @@ export class AuthService {
         stored.user.tokenVersion,
         snapshot.roleNames,
         snapshot.permissions,
+        stored.handheldDeviceId ?? undefined,
       );
       await tx.refreshToken.create({ data: issued.refreshTokenRecord });
       const event = await tx.userEvent.create({
@@ -186,6 +216,20 @@ export class AuthService {
         where: { userId: stored.user.id },
         data: { lastActivityAt: event.createdAt },
       });
+      if (stored.handheldDeviceId) {
+        const deviceEvent = await tx.handheldDeviceEvent.create({
+          data: {
+            handheldDeviceId: stored.handheldDeviceId,
+            eventType: HandheldDeviceEventType.DEVICE_TOKEN_REFRESHED,
+            actorUserId: stored.user.id,
+            correlationId: event.correlationId,
+          },
+        });
+        await tx.handheldDeviceSnapshot.update({
+          where: { id: stored.handheldDeviceId },
+          data: { lastActivityAt: deviceEvent.createdAt },
+        });
+      }
 
       return issued.response;
     });
@@ -284,6 +328,7 @@ export class AuthService {
     tokenVersion: number,
     roles: string[],
     permissions: string[],
+    handheldDeviceId?: string,
   ) {
     const payload: AccessTokenPayload = {
       sub: userId,
@@ -292,6 +337,7 @@ export class AuthService {
       permissions,
       tokenVersion,
       type: 'access',
+      ...(handheldDeviceId && { handheldDeviceId }),
     };
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: accessTokenSecret(),
@@ -311,11 +357,18 @@ export class AuthService {
         userId,
         tokenHash: this.hashToken(refreshToken),
         expiresAt,
+        ...(handheldDeviceId && { handheldDeviceId }),
       },
     };
   }
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private matchesCredential(credential: string, expectedHash: string) {
+    const actual = Buffer.from(this.hashToken(credential), 'hex');
+    const expected = Buffer.from(expectedHash, 'hex');
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
   }
 }

@@ -6,7 +6,8 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaClient } from '@prisma/client';
+import { HandheldDevicePlatform, PrismaClient, UserStatus } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
@@ -15,6 +16,8 @@ import { AuthorizationModule } from '../src/modules/authorization/authorization.
 import { Permissions } from '../src/modules/authorization/decorators/permissions.decorator';
 import { PermissionsGuard } from '../src/modules/authorization/guards/permissions.guard';
 import { createAuthenticatedAdmin } from './authenticated-admin.fixture';
+import { UserService } from '../src/modules/users/services/user.service';
+import { TerminalService } from '../src/modules/terminals/services/terminal.service';
 
 @Controller('authorization-test')
 class AuthorizationTestController {
@@ -215,4 +218,113 @@ describe('Authentication and authorization (e2e)', () => {
       ]),
     );
   });
+
+  it('enrolls a handheld and invalidates its access and refresh sessions when revoked', async () => {
+    const users = app.get(UserService);
+    const terminals = app.get(TerminalService);
+    const terminal = await terminals.createTerminal({
+      terminalCode: threeLetterTerminalCode(),
+      city: 'Calgary',
+      province: 'Alberta',
+      country: 'Canada',
+      timezone: 'America/Edmonton',
+    });
+    const suffix = unique('managed-device');
+    const badgeBarcode = `BADGE-${suffix}`;
+    const employeeNumber = `EMP-${suffix}`;
+    const employee = await users.createUser({
+      employeeNumber,
+      badgeBarcode,
+      email: `${suffix}@example.com`,
+      firstName: 'Managed',
+      lastName: 'Operator',
+      password: 'ManagedDevice!1',
+      status: UserStatus.ACTIVE,
+    });
+    await users.assignTerminal(employee.user.id, terminal.terminal.id);
+    const deviceId = randomUUID();
+
+    const enrollment = await request(app.getHttpServer())
+      .post('/handheld-devices')
+      .set('Authorization', administratorAuthorization)
+      .send({
+        deviceId,
+        displayName: 'Integration Android device',
+        platform: HandheldDevicePlatform.ANDROID,
+      })
+      .expect(201);
+    expect(enrollment.body.credential).toHaveLength(43);
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/v1/auth/login')
+      .send({
+        badgeBarcode,
+        employeeId: employeeNumber,
+        deviceId,
+        deviceCredential: 'x'.repeat(43),
+      })
+      .expect(401);
+
+    const login = await request(app.getHttpServer())
+      .post('/api/mobile/v1/auth/login')
+      .send({
+        badgeBarcode,
+        employeeId: employeeNumber,
+        deviceId,
+        deviceCredential: enrollment.body.credential,
+      })
+      .expect(201);
+    const refreshed = await request(app.getHttpServer())
+      .post('/api/mobile/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(201);
+
+    const stored = await prisma.handheldDevice.findUniqueOrThrow({
+      where: { deviceId },
+      include: { snapshot: true },
+    });
+    await request(app.getHttpServer())
+      .post(`/handheld-devices/${stored.id}/revoke`)
+      .set('Authorization', administratorAuthorization)
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get('/api/mobile/v1/bootstrap')
+      .set('Authorization', `Bearer ${refreshed.body.accessToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/api/mobile/v1/auth/refresh')
+      .send({ refreshToken: refreshed.body.refreshToken })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/api/mobile/v1/auth/login')
+      .send({
+        badgeBarcode,
+        employeeId: employeeNumber,
+        deviceId,
+        deviceCredential: enrollment.body.credential,
+      })
+      .expect(401);
+
+    const [snapshot, events] = await Promise.all([
+      prisma.handheldDeviceSnapshot.findUniqueOrThrow({ where: { id: stored.id } }),
+      prisma.handheldDeviceEvent.findMany({
+        where: { handheldDeviceId: stored.id },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    expect(snapshot.currentStatus).toBe('REVOKED');
+    expect(events.map(({ eventType }) => eventType)).toEqual([
+      'DEVICE_ENROLLED',
+      'DEVICE_AUTHENTICATED',
+      'DEVICE_TOKEN_REFRESHED',
+      'DEVICE_REVOKED',
+    ]);
+  });
 });
+
+function threeLetterTerminalCode() {
+  return Array.from({ length: 3 }, () =>
+    String.fromCharCode(65 + Math.floor(Math.random() * 26)),
+  ).join('');
+}

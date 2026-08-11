@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
-import { UserStatus } from '@prisma/client';
+import { HandheldDeviceStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { accessTokenSecret } from '../auth.constants';
 import type { AccessTokenPayload } from '../interfaces/authenticated-user.interface';
@@ -58,6 +58,14 @@ export class JwtAuthGuard implements CanActivate {
     ) {
       throw new UnauthorizedException('Session is no longer valid');
     }
+    if (payload.handheldDeviceId) {
+      const device = await this.prisma.handheldDeviceSnapshot.findUnique({
+        where: { id: payload.handheldDeviceId },
+      });
+      if (device?.currentStatus !== HandheldDeviceStatus.ACTIVE) {
+        throw new UnauthorizedException('Device session is no longer valid');
+      }
+    }
 
     request.user = {
       userId: user.id,
@@ -65,6 +73,9 @@ export class JwtAuthGuard implements CanActivate {
       roles: user.snapshot.roleNames,
       permissions: user.snapshot.permissions,
       tokenVersion: user.tokenVersion,
+      ...(payload.handheldDeviceId && {
+        handheldDeviceId: payload.handheldDeviceId,
+      }),
     };
     return true;
   }

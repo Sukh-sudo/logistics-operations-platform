@@ -509,15 +509,20 @@ Metrics require `system.admin`. Health routes are public.
 The mobile contract uses `/api/mobile/v1` and requires JWT authentication
 except for the initial online login and token refresh.
 
-Badge plus employee-number login is a non-production portfolio flow. The
-backend fails closed for this flow when `NODE_ENV=production` until a stronger
-employee PIN/password or managed-device enrollment design is implemented.
+Badge plus employee-number login is bound to a previously enrolled device. The
+client automatically submits the installation ID and device credential; the
+operator's recurring login fields remain unchanged. Device administration
+requires `system.admin`.
 
 ```text
 POST /api/mobile/v1/auth/login
 POST /api/mobile/v1/auth/refresh
 POST /api/mobile/v1/auth/logout
 GET  /api/mobile/v1/bootstrap
+
+POST /handheld-devices
+GET  /handheld-devices
+POST /handheld-devices/{id}/revoke
 
 POST /api/mobile/v1/work-sessions
 POST /api/mobile/v1/work-sessions/{id}/pause
@@ -535,6 +540,10 @@ GET /api/mobile/v1/containers/{containerBarcode}
 GET /api/mobile/v1/trailers/{trailerId}
 GET /api/mobile/v1/routes/{routeCode}
 ```
+
+`POST /handheld-devices` returns the enrollment credential only once. The
+server stores its SHA-256 hash. Revocation invalidates device-bound access and
+refresh sessions.
 
 Every scan uses a unique `clientEventId`. Parsed synchronization batches
 return one durable result per command with `ACCEPTED`, `REJECTED`,

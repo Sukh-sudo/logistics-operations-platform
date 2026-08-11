@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
-import { UserStatus } from '@prisma/client';
+import { HandheldDeviceStatus, UserStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 describe('JwtAuthGuard', () => {
@@ -11,7 +11,10 @@ describe('JwtAuthGuard', () => {
     getClass: () => undefined,
   } as unknown as ExecutionContext;
   const jwt = { verifyAsync: jest.fn() };
-  const prisma = { user: { findUnique: jest.fn() } };
+  const prisma = {
+    user: { findUnique: jest.fn() },
+    handheldDeviceSnapshot: { findUnique: jest.fn() },
+  };
   const reflector = { getAllAndOverride: jest.fn().mockReturnValue(false) };
 
   beforeEach(() => jest.clearAllMocks());
@@ -50,6 +53,32 @@ describe('JwtAuthGuard', () => {
     prisma.user.findUnique.mockResolvedValue({
       tokenVersion: 2,
       snapshot: { currentStatus: UserStatus.ACTIVE },
+    });
+
+    await expect(
+      new JwtAuthGuard(jwt as never, prisma as never, reflector as never).canActivate(context),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects an otherwise valid token after its handheld is revoked', async () => {
+    jwt.verifyAsync.mockResolvedValue({
+      sub: 'user-1',
+      type: 'access',
+      tokenVersion: 1,
+      handheldDeviceId: 'device-1',
+    });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'operator@example.com',
+      tokenVersion: 1,
+      snapshot: {
+        currentStatus: UserStatus.ACTIVE,
+        roleNames: [],
+        permissions: [],
+      },
+    });
+    prisma.handheldDeviceSnapshot.findUnique.mockResolvedValue({
+      currentStatus: HandheldDeviceStatus.REVOKED,
     });
 
     await expect(

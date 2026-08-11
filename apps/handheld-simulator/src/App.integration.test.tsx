@@ -43,6 +43,7 @@ describe('handheld simulator workflow', () => {
     vi.spyOn(crypto, 'randomUUID').mockImplementation(
       () => `00000000-0000-4000-8000-${String(++id).padStart(12, '0')}`,
     );
+    localStorage.setItem('handheld.device-credential', 'd'.repeat(43));
   });
 
   it('authenticates, starts trailer work, and shows the accepted backend outcome', async () => {
@@ -75,6 +76,12 @@ describe('handheld simulator workflow', () => {
     await user.type(screen.getByLabelText(/employee id/i), 'EMP-1001');
     await user.click(screen.getByRole('button', { name: /authenticate/i }));
     expect(await screen.findByText(/good shift, alex/i)).toBeTruthy();
+    const loginRequest = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(loginRequest).toMatchObject({
+      badgeBarcode: 'EMP-BADGE-1',
+      employeeId: 'EMP-1001',
+      deviceCredential: 'd'.repeat(43),
+    });
 
     await user.click(screen.getByText(/^Load trailer$/).closest('button')!);
     await user.click(await screen.findByRole('button', { name: /main menu/i }));
@@ -94,6 +101,23 @@ describe('handheld simulator workflow', () => {
     });
     // Persist-before-send leaves the authoritative result available after reload.
     expect(localStorage.getItem('handheld.outbox')).toContain('"syncState":"ACCEPTED"');
+  });
+
+  it('requires one-time device provisioning before showing normal sign in', async () => {
+    localStorage.removeItem('handheld.device-credential');
+    const user = userEvent.setup();
+    render(<App />);
+
+    const signIn = screen.getByRole('button', { name: /authenticate/i });
+    expect((signIn as HTMLButtonElement).disabled).toBe(true);
+    await user.type(
+      screen.getByLabelText(/one-time enrollment credential/i),
+      'e'.repeat(43),
+    );
+    await user.click(screen.getByRole('button', { name: /save device enrollment/i }));
+
+    expect(localStorage.getItem('handheld.device-credential')).toBe('e'.repeat(43));
+    expect(screen.queryByLabelText(/one-time enrollment credential/i)).toBeNull();
   });
 
   it('captures work offline and later batch-syncs the original command', async () => {

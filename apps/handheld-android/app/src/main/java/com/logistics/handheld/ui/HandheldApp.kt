@@ -53,6 +53,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -187,6 +188,44 @@ private fun LoginScreen(state: HandheldUiState, viewModel: HandheldViewModel) {
                     else MaterialTheme.colorScheme.error,
                 )
                 MessageBanner(state.error, state.notice, viewModel::clearMessage)
+                Text(
+                    "Device ID: ${state.deviceId.ifBlank { "Loadingâ€¦" }}",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                if (!state.deviceEnrolled || state.configuringDevice) {
+                    Text(
+                        "Ask an administrator to enroll the Device ID, then enter the one-time credential.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    OutlinedTextField(
+                        value = state.deviceCredential,
+                        onValueChange = viewModel::setDeviceCredential,
+                        label = { Text("Enrollment credential") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                    FilledTonalButton(
+                        onClick = viewModel::saveDeviceEnrollment,
+                        enabled = !state.busy && state.deviceCredential.length >= 32,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    ) {
+                        Text("Save device enrollment")
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("Device enrolled", color = MaterialTheme.colorScheme.primary)
+                        TextButton(onClick = viewModel::configureDevice) {
+                            Text("Replace credential")
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = state.badge,
                     onValueChange = viewModel::setBadge,
@@ -209,7 +248,7 @@ private fun LoginScreen(state: HandheldUiState, viewModel: HandheldViewModel) {
                 )
                 Button(
                     onClick = viewModel::login,
-                    enabled = !state.busy && state.online,
+                    enabled = !state.busy && state.online && state.deviceEnrolled,
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                 ) {
                     if (state.busy) {
