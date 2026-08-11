@@ -1,4 +1,4 @@
-import { ShipmentStatus } from '@prisma/client';
+import { ShipmentEventType, ShipmentStatus } from '@prisma/client';
 
 import { TrackingService } from '../services/tracking.service';
 
@@ -44,14 +44,24 @@ describe('TrackingService', () => {
         {
           package: {
             trackingNumber: 'CON1234567',
-            currentStatus: 'OUT_FOR_DELIVERY',
-            updatedAt: new Date(),
+            snapshot: {
+              currentStatus: 'OUT_FOR_DELIVERY',
+              updatedAt: new Date(),
+            },
           },
         },
       ],
       events: [
         {
-          eventType: 'SHIPMENT_OUT_FOR_DELIVERY',
+          eventType: ShipmentEventType.PACKAGE_ASSIGNED,
+          createdAt: new Date(),
+        },
+        {
+          eventType: ShipmentEventType.SHIPMENT_PROGRESS_UPDATED,
+          createdAt: new Date(),
+        },
+        {
+          eventType: ShipmentEventType.SHIPMENT_OUT_FOR_DELIVERY,
           createdAt: new Date(),
         },
       ],
@@ -65,6 +75,17 @@ describe('TrackingService', () => {
     );
     expect(result.status).toBe(ShipmentStatus.IN_TRANSIT);
     expect(result.progress.outForDeliveryPackages).toBe(1);
+    expect(result.packages).toEqual([
+      expect.objectContaining({
+        trackingNumber: 'CON1234567',
+        status: 'OUT_FOR_DELIVERY',
+      }),
+    ]);
+    expect(result.milestones).toEqual([
+      expect.objectContaining({
+        type: ShipmentEventType.SHIPMENT_OUT_FOR_DELIVERY,
+      }),
+    ]);
     expect(result).not.toHaveProperty('id');
     expect(result).not.toHaveProperty('notificationRecipient');
   });

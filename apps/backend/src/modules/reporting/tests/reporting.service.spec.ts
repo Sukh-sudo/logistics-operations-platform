@@ -62,4 +62,30 @@ describe('ReportingService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('returns empty-safe totals when no snapshots match', async () => {
+    prisma.shipment.findMany.mockResolvedValue([]);
+
+    const report = await service.getDeliveryReport();
+
+    expect(report.totals).toMatchObject({
+      totalShipments: 0,
+      completedShipments: 0,
+      activeShipments: 0,
+      totalPackages: 0,
+      deliveredPackages: 0,
+      completionRate: 0,
+    });
+    expect(report.deliveries).toEqual([]);
+  });
+
+  it('rejects impossible UTC calendar dates', async () => {
+    await expect(
+      service.getDeliveryReport({ fromDate: '2026-02-30' }),
+    ).rejects.toThrow(
+      'fromDate must be a valid calendar date in YYYY-MM-DD format',
+    );
+
+    expect(prisma.shipment.findMany).not.toHaveBeenCalled();
+  });
 });

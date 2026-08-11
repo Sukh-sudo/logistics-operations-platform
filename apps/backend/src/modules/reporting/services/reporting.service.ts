@@ -90,7 +90,14 @@ export class ReportingService {
   private dateRange(
     query: Pick<DeliveryReportQueryDto, 'fromDate' | 'toDate'>,
   ): Prisma.DateTimeFilter | undefined {
-    if (query.fromDate && query.toDate && query.fromDate > query.toDate) {
+    const fromDate = query.fromDate
+      ? this.parseUtcDate(query.fromDate, 'fromDate')
+      : undefined;
+    const toDate = query.toDate
+      ? this.parseUtcDate(query.toDate, 'toDate')
+      : undefined;
+
+    if (fromDate && toDate && fromDate > toDate) {
       throw new BadRequestException(
         'fromDate must be on or before toDate',
       );
@@ -100,14 +107,32 @@ export class ReportingService {
     }
 
     const range: Prisma.DateTimeFilter = {};
-    if (query.fromDate) {
-      range.gte = new Date(`${query.fromDate}T00:00:00.000Z`);
+    if (fromDate) {
+      range.gte = fromDate;
     }
-    if (query.toDate) {
-      const exclusiveEnd = new Date(`${query.toDate}T00:00:00.000Z`);
+    if (toDate) {
+      const exclusiveEnd = new Date(toDate);
       exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
       range.lt = exclusiveEnd;
     }
     return range;
+  }
+
+  /**
+   * JavaScript normalizes impossible dates (for example February 30) instead
+   * of rejecting them. Comparing the normalized value keeps report filters
+   * aligned with the documented YYYY-MM-DD UTC calendar-date contract.
+   */
+  private parseUtcDate(value: string, field: 'fromDate' | 'toDate') {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.toISOString().slice(0, 10) !== value
+    ) {
+      throw new BadRequestException(
+        `${field} must be a valid calendar date in YYYY-MM-DD format`,
+      );
+    }
+    return date;
   }
 }

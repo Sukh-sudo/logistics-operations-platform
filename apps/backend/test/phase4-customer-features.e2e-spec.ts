@@ -1,9 +1,14 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { PrismaClient } from '@prisma/client';
+import {
+  NotificationEventType,
+  NotificationStatus,
+  NotificationType,
+  PrismaClient,
+  ShipmentEventType,
+  ShipmentStatus,
+} from '@prisma/client';
 import request from 'supertest';
 
-import { AppModule } from '../src/app.module';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { packageIdentifier } from './support/asset-identifiers';
 import { createOperationalTestingModule } from './support/operational-testing-module';
@@ -110,6 +115,16 @@ describe('Phase 4 customer features (e2e)', () => {
       },
     });
     expect(inTransit.body).not.toHaveProperty('notificationRecipient');
+    expect(
+      inTransit.body.milestones.map(
+        (milestone: { type: string }) => milestone.type,
+      ),
+    ).not.toEqual(
+      expect.arrayContaining([
+        ShipmentEventType.PACKAGE_ASSIGNED,
+        ShipmentEventType.SHIPMENT_PROGRESS_UPDATED,
+      ]),
+    );
 
     const beforeDelivery = await request(app.getHttpServer())
       .get('/notifications')
@@ -154,7 +169,12 @@ describe('Phase 4 customer features (e2e)', () => {
       ),
     ).toContain('DELIVERED');
 
-    const notificationId = notifications.body[0].id as string;
+    const deliveredNotificationResponse = notifications.body.find(
+      (notification: { type: string }) =>
+        notification.type === NotificationType.DELIVERED,
+    ) as { id: string } | undefined;
+    expect(deliveredNotificationResponse).toBeDefined();
+    const notificationId = deliveredNotificationResponse!.id;
     const read = await request(app.getHttpServer())
       .patch(`/notifications/${notificationId}/read`)
       .expect(200);
@@ -166,6 +186,53 @@ describe('Phase 4 customer features (e2e)', () => {
       currentStatus: 'UNREAD',
       deliveryAttempts: 2,
     });
+
+    // Verify the database-side event/snapshot pairs, not only their HTTP
+    // representations, so transactional Phase 4 persistence is covered.
+    const persistedShipment = await prisma.shipment.findUniqueOrThrow({
+      where: { shipmentNumber },
+      include: {
+        snapshot: true,
+        events: { orderBy: { createdAt: 'asc' } },
+        notifications: {
+          include: {
+            snapshot: true,
+            events: { orderBy: { createdAt: 'asc' } },
+          },
+        },
+      },
+    });
+    expect(persistedShipment.snapshot).toMatchObject({
+      currentStatus: ShipmentStatus.COMPLETED,
+      currentTerminalId: destinationTerminalId,
+      deliveredPackages: 1,
+      remainingPackages: 0,
+      progressPercent: 100,
+    });
+    const deliveredEvent = persistedShipment.events.find(
+      (event) => event.eventType === ShipmentEventType.SHIPMENT_COMPLETED,
+    );
+    expect(deliveredEvent?.sourcePackageEventId).toBeTruthy();
+
+    const deliveredNotification = persistedShipment.notifications.find(
+      (notification) => notification.type === NotificationType.DELIVERED,
+    );
+    expect(deliveredNotification).toMatchObject({
+      sourceEventId: deliveredEvent?.id,
+      snapshot: {
+        currentStatus: NotificationStatus.UNREAD,
+        deliveryAttempts: 2,
+      },
+    });
+    expect(
+      deliveredNotification?.events.map((event) => event.eventType),
+    ).toEqual(
+      expect.arrayContaining([
+        NotificationEventType.NOTIFICATION_CREATED,
+        NotificationEventType.NOTIFICATION_READ,
+        NotificationEventType.NOTIFICATION_RESEND_REQUESTED,
+      ]),
+    );
 
     const date = new Date().toISOString().slice(0, 10);
     const report = await request(app.getHttpServer())
@@ -184,5 +251,12 @@ describe('Phase 4 customer features (e2e)', () => {
       deliveredPackages: 1,
       completionRate: 100,
     });
+  });
+
+  it('rejects an impossible delivery report calendar date', async () => {
+    await request(app.getHttpServer())
+      .get('/reports/deliveries')
+      .query({ fromDate: '2026-02-30' })
+      .expect(400);
   });
 });

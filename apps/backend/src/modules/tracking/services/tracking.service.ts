@@ -1,6 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ShipmentEventType } from '@prisma/client';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+
+// Customer tracking shows lifecycle milestones, not internal projection and
+// membership events that are intended only for operational auditing.
+const CUSTOMER_MILESTONE_TYPES = new Set<ShipmentEventType>([
+  ShipmentEventType.SHIPMENT_CREATED,
+  ShipmentEventType.SHIPMENT_IN_TRANSIT,
+  ShipmentEventType.SHIPMENT_OUT_FOR_DELIVERY,
+  ShipmentEventType.SHIPMENT_COMPLETED,
+  ShipmentEventType.SHIPMENT_CANCELLED,
+]);
 
 @Injectable()
 export class TrackingService {
@@ -62,10 +73,12 @@ export class TrackingService {
             }]
           : [],
       ),
-      milestones: shipment.events.map((event) => ({
-        type: event.eventType,
-        occurredAt: event.createdAt,
-      })),
+      milestones: shipment.events
+        .filter((event) => CUSTOMER_MILESTONE_TYPES.has(event.eventType))
+        .map((event) => ({
+          type: event.eventType,
+          occurredAt: event.createdAt,
+        })),
     };
   }
 
