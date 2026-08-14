@@ -409,6 +409,14 @@ POST /notifications/{id}/resend
 The current delivery channel is in-app. Reads and resend requests append
 Notification Events and update Notification Snapshots transactionally.
 
+These routes require authentication. Recipients may list, inspect, mark read,
+and request resend only for notifications whose normalized `recipient` equals
+their current account email. Supplying another recipient in the collection
+filter returns `403`; direct access to another recipient's notification returns
+`404` to avoid exposing object existence. Users with `system.admin` may access
+all recipients. Read and resend events include the acting user ID in their
+audit payload.
+
 ---
 
 ## Reporting

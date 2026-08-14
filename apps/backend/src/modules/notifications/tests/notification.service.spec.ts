@@ -11,6 +11,7 @@ describe('NotificationService', () => {
   const tx = {
     notification: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
     notificationEvent: { create: jest.fn() },
@@ -23,8 +24,22 @@ describe('NotificationService', () => {
     $transaction: jest.fn((callback) => callback(tx)),
     notification: {
       findMany: jest.fn(),
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
+  };
+  const recipient = {
+    userId: 'customer-1',
+    email: 'Customer@Example.com',
+    roles: ['CUSTOMER'],
+    permissions: [],
+    tokenVersion: 0,
+  };
+  const administrator = {
+    userId: 'admin-1',
+    email: 'admin@example.com',
+    roles: [],
+    permissions: ['system.admin'],
+    tokenVersion: 0,
   };
   let service: NotificationService;
 
@@ -125,10 +140,49 @@ describe('NotificationService', () => {
     expect(tx.notificationSnapshot.create).not.toHaveBeenCalled();
   });
 
+  it('scopes collection reads to the authenticated recipient', async () => {
+    prisma.notification.findMany.mockResolvedValue([]);
+
+    await service.getNotifications({}, recipient);
+
+    expect(prisma.notification.findMany).toHaveBeenCalledWith({
+      where: { recipient: 'customer@example.com' },
+      include: { snapshot: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('rejects another recipient filter but permits administrator filtering', async () => {
+    expect(() =>
+      service.getNotifications({ recipient: 'other@example.com' }, recipient),
+    ).toThrow('Notifications may only be listed');
+
+    await service.getNotifications(
+      { recipient: 'Other@Example.com' },
+      administrator,
+    );
+    expect(prisma.notification.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { recipient: 'other@example.com' } }),
+    );
+  });
+
+  it('uses a recipient-scoped query for notification history', async () => {
+    prisma.notification.findFirst.mockResolvedValue({ id: 'n1' });
+
+    await service.getNotification('n1', recipient);
+
+    expect(prisma.notification.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'n1', recipient: 'customer@example.com' },
+      }),
+    );
+  });
+
   it('records a read event and updates the snapshot in one transaction', async () => {
     const readAt = new Date('2026-07-24T12:00:00.000Z');
-    tx.notification.findUnique.mockResolvedValue({
+    tx.notification.findFirst.mockResolvedValue({
       id: 'n1',
+      recipient: 'customer@example.com',
       snapshot: { currentStatus: NotificationStatus.UNREAD },
     });
     tx.notificationEvent.create.mockResolvedValue({
@@ -140,13 +194,14 @@ describe('NotificationService', () => {
       readAt,
     });
 
-    const result = await service.markRead('n1', 'request-read');
+    const result = await service.markRead('n1', recipient, 'request-read');
 
     expect(tx.notificationEvent.create).toHaveBeenCalledWith({
       data: {
         notificationId: 'n1',
         eventType: NotificationEventType.NOTIFICATION_READ,
         correlationId: 'request-read',
+        payload: { actorUserId: 'customer-1' },
       },
     });
     expect(tx.notificationSnapshot.update).toHaveBeenCalledWith({
@@ -162,8 +217,9 @@ describe('NotificationService', () => {
 
   it('records a resend event and resets the unread snapshot state', async () => {
     const resentAt = new Date('2026-07-24T13:00:00.000Z');
-    tx.notification.findUnique.mockResolvedValue({
+    tx.notification.findFirst.mockResolvedValue({
       id: 'n1',
+      recipient: 'customer@example.com',
       snapshot: { currentStatus: NotificationStatus.READ },
     });
     tx.notificationEvent.create.mockResolvedValue({
@@ -175,13 +231,14 @@ describe('NotificationService', () => {
       deliveryAttempts: 2,
     });
 
-    const result = await service.resend('n1', 'request-resend');
+    const result = await service.resend('n1', recipient, 'request-resend');
 
     expect(tx.notificationEvent.create).toHaveBeenCalledWith({
       data: {
         notificationId: 'n1',
         eventType: NotificationEventType.NOTIFICATION_RESEND_REQUESTED,
         correlationId: 'request-resend',
+        payload: { actorUserId: 'customer-1' },
       },
     });
     expect(tx.notificationSnapshot.update).toHaveBeenCalledWith({
@@ -195,5 +252,19 @@ describe('NotificationService', () => {
       },
     });
     expect(result.snapshot.currentStatus).toBe(NotificationStatus.UNREAD);
+  });
+
+  it('returns not found before writing when a notification is outside the recipient scope', async () => {
+    tx.notification.findFirst.mockResolvedValue(null);
+
+    await expect(service.markRead('other', recipient)).rejects.toThrow(
+      'Notification not found',
+    );
+    expect(tx.notification.findFirst).toHaveBeenCalledWith({
+      where: { id: 'other', recipient: 'customer@example.com' },
+      include: { snapshot: true },
+    });
+    expect(tx.notificationEvent.create).not.toHaveBeenCalled();
+    expect(tx.notificationSnapshot.update).not.toHaveBeenCalled();
   });
 });

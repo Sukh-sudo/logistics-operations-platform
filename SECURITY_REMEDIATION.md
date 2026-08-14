@@ -15,13 +15,13 @@ exploit instructions or production secrets.
 | Administrator bootstrap secret could provision multiple administrators | Remediated | Bootstrap now succeeds only on an empty user store, compares the secret in constant time, and uses a serializable Prisma transaction to prevent concurrent initial administrators. Remove `BOOTSTRAP_ADMIN_SECRET` after provisioning. |
 | Android release builds allowed cleartext API traffic | Remediated | Cleartext is disabled in the main manifest and enabled only by the debug manifest. Release builds use an HTTPS endpoint supplied with `handheldApiBaseUrl`. |
 | Production dependency advisories | Remediated | Direct packages and narrowly scoped transitive overrides were upgraded. `pnpm audit --prod` reports no known vulnerabilities. Keep the audit as a required CI check. |
-| Notification history and resend operations lacked an authorization boundary | Remediated conservatively | Notification operations currently require `system.admin`. Define a narrower notification permission or recipient-ownership policy before granting non-admin access. |
+| Notification history and resend operations lacked object authorization | Remediated | Authenticated recipients are scoped to notifications whose normalized recipient email matches their current account. Cross-recipient object access returns 404, cross-recipient collection filters return 403, and `system.admin` retains audited management access. Read/resend events record the acting user. |
 
 ## Authorization architecture follow-up
 
 The current catalog has granular permissions for packages, containers,
 trailers, terminals, users, and roles. Modules without an established policy
-(dashboard, fleet, notifications, reporting, routes, search, shipments, trips,
+(dashboard, fleet, reporting, routes, search, shipments, trips,
 metrics, and snapshot recovery) now require `system.admin`.
 
 Before enabling those modules for operational roles, document a permission

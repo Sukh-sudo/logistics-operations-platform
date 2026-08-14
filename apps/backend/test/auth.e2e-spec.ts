@@ -148,6 +148,7 @@ describe('Authentication and authorization (e2e)', () => {
       .expect(200, { authorized: true });
 
     // A valid account cannot cross into unrelated operational or recovery APIs.
+    // Notification self-service is the explicit exception and is recipient-scoped.
     await request(app.getHttpServer())
       .get('/terminals')
       .set('Authorization', `Bearer ${login.body.accessToken}`)
@@ -155,7 +156,7 @@ describe('Authentication and authorization (e2e)', () => {
     await request(app.getHttpServer())
       .get('/notifications')
       .set('Authorization', `Bearer ${login.body.accessToken}`)
-      .expect(403);
+      .expect(200, []);
     await request(app.getHttpServer())
       .post('/snapshots/rebuild')
       .set('Authorization', `Bearer ${login.body.accessToken}`)

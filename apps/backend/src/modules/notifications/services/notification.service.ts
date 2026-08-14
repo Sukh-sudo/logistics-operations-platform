@@ -1,14 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   NotificationEventType,
   NotificationStatus,
   NotificationType,
+  Prisma,
   ShipmentEventType,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { NotificationQueryDto } from '../dto/notification-query.dto';
+import type { AuthenticatedUser } from '../../auth/interfaces/authenticated-user.interface';
+import { PERMISSIONS } from '../../authorization/constants/permissions';
 
 interface ShipmentNotificationSource {
   event: {
@@ -86,19 +93,40 @@ export class NotificationService {
     });
   }
 
-  getNotifications(query: NotificationQueryDto = {}) {
+  getNotifications(
+    query: NotificationQueryDto = {},
+    actor: AuthenticatedUser,
+  ) {
+    const actorEmail = this.normalizedEmail(actor.email);
+    const requestedRecipient = query.recipient
+      ? this.normalizedEmail(query.recipient)
+      : undefined;
+    if (
+      !this.canManageAll(actor) &&
+      requestedRecipient &&
+      requestedRecipient !== actorEmail
+    ) {
+      throw new ForbiddenException(
+        'Notifications may only be listed for the authenticated recipient',
+      );
+    }
+
     return this.prisma.notification.findMany({
-      where: query.recipient
-        ? { recipient: query.recipient.trim().toLowerCase() }
-        : undefined,
+      // Recipient scoping happens in SQL, so unauthorized rows never enter
+      // application memory or the response serializer.
+      where: this.canManageAll(actor)
+        ? requestedRecipient
+          ? { recipient: requestedRecipient }
+          : undefined
+        : { recipient: actorEmail },
       include: { snapshot: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async getNotification(id: string) {
-    const notification = await this.prisma.notification.findUnique({
-      where: { id },
+  async getNotification(id: string, actor: AuthenticatedUser) {
+    const notification = await this.prisma.notification.findFirst({
+      where: this.accessWhere(id, actor),
       include: {
         snapshot: true,
         events: { orderBy: { createdAt: 'asc' } },
@@ -110,10 +138,14 @@ export class NotificationService {
     return notification;
   }
 
-  async markRead(id: string, requestId?: string) {
+  async markRead(
+    id: string,
+    actor: AuthenticatedUser,
+    requestId?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
-      const notification = await tx.notification.findUnique({
-        where: { id },
+      const notification = await tx.notification.findFirst({
+        where: this.accessWhere(id, actor),
         include: { snapshot: true },
       });
       if (!notification?.snapshot) {
@@ -128,6 +160,7 @@ export class NotificationService {
           notificationId: id,
           eventType: NotificationEventType.NOTIFICATION_READ,
           correlationId: requestId ?? randomUUID(),
+          payload: { actorUserId: actor.userId },
         },
       });
       const snapshot = await tx.notificationSnapshot.update({
@@ -142,10 +175,14 @@ export class NotificationService {
     });
   }
 
-  async resend(id: string, requestId?: string) {
+  async resend(
+    id: string,
+    actor: AuthenticatedUser,
+    requestId?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
-      const notification = await tx.notification.findUnique({
-        where: { id },
+      const notification = await tx.notification.findFirst({
+        where: this.accessWhere(id, actor),
         include: { snapshot: true },
       });
       if (!notification?.snapshot) {
@@ -157,6 +194,7 @@ export class NotificationService {
           notificationId: id,
           eventType: NotificationEventType.NOTIFICATION_RESEND_REQUESTED,
           correlationId: requestId ?? randomUUID(),
+          payload: { actorUserId: actor.userId },
         },
       });
       const snapshot = await tx.notificationSnapshot.update({
@@ -187,5 +225,27 @@ export class NotificationService {
       [ShipmentEventType.SHIPMENT_CANCELLED]: NotificationType.EXCEPTION,
     };
     return customerEvents[eventType] ?? null;
+  }
+
+  private accessWhere(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Prisma.NotificationWhereInput {
+    return this.canManageAll(actor)
+      ? { id }
+      : { id, recipient: this.normalizedEmail(actor.email) };
+  }
+
+  private canManageAll(actor: AuthenticatedUser) {
+    return (
+      actor.permissions.includes(PERMISSIONS.SYSTEM_ADMIN) ||
+      actor.roles.some((role) =>
+        ['ADMIN', 'ADMINISTRATOR'].includes(role.toUpperCase()),
+      )
+    );
+  }
+
+  private normalizedEmail(email: string) {
+    return email.trim().toLowerCase();
   }
 }
