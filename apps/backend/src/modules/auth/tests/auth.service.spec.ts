@@ -30,7 +30,7 @@ describe('AuthService', () => {
     snapshot,
   };
   const tx = {
-    user: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn(), update: jest.fn() },
     refreshToken: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -62,6 +62,7 @@ describe('AuthService', () => {
       snapshot: { currentStatus: HandheldDeviceStatus.ACTIVE },
     });
     tx.handheldDeviceEvent.create.mockResolvedValue({ createdAt: new Date() });
+    tx.refreshToken.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('logs in an active user and atomically persists the session, event, and snapshot', async () => {
@@ -73,6 +74,14 @@ describe('AuthService', () => {
     });
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(jwt.signAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'access' }),
+      expect.objectContaining({
+        algorithm: 'HS256',
+        issuer: 'logistics-operations-platform',
+        audience: 'logistics-platform-clients',
+      }),
+    );
     expect(tx.refreshToken.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',
@@ -165,19 +174,67 @@ describe('AuthService', () => {
       user,
       handheldDeviceId: null,
       handheldDevice: null,
+      familyId: 'family-1',
+      rotatedAt: null,
+      reuseDetectedAt: null,
     });
 
     await service.refresh('a'.repeat(64));
 
-    expect(tx.refreshToken.update).toHaveBeenCalledWith({
-      where: { id: 'refresh-1' },
-      data: { revokedAt: expect.any(Date) },
+    expect(tx.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { id: 'refresh-1', revokedAt: null },
+      data: { revokedAt: expect.any(Date), rotatedAt: expect.any(Date) },
     });
-    expect(tx.refreshToken.create).toHaveBeenCalledTimes(1);
+    expect(tx.refreshToken.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ familyId: 'family-1' }),
+    });
     expect(tx.userEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         eventType: UserEventType.REFRESH_TOKEN_ROTATED,
       }),
+    });
+  });
+
+  it('revokes a token family and invalidates access tokens when a rotated token is replayed', async () => {
+    tx.refreshToken.findUnique.mockResolvedValue({
+      id: 'refresh-1',
+      revokedAt: new Date(),
+      rotatedAt: new Date(),
+      reuseDetectedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      familyId: 'family-1',
+      user,
+      handheldDeviceId: null,
+      handheldDevice: null,
+    });
+    tx.refreshToken.updateMany
+      .mockResolvedValueOnce({ count: 2 })
+      .mockResolvedValueOnce({ count: 1 });
+
+    await expect(service.refresh('a'.repeat(64))).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+
+    expect(tx.refreshToken.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { familyId: 'family-1', reuseDetectedAt: null },
+      data: { reuseDetectedAt: expect.any(Date) },
+    });
+    expect(tx.refreshToken.updateMany).toHaveBeenNthCalledWith(2, {
+      where: { familyId: 'family-1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { tokenVersion: { increment: 1 } },
+    });
+    expect(tx.userEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: UserEventType.REFRESH_TOKEN_REUSE_DETECTED,
+      }),
+    });
+    expect(tx.userSnapshot.update).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      data: { lastActivityAt: expect.any(Date) },
     });
   });
 });

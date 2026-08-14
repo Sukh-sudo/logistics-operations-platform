@@ -8,7 +8,12 @@ import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { HandheldDeviceStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { accessTokenSecret } from '../auth.constants';
+import {
+  JWT_ALGORITHM,
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  accessTokenSecret,
+} from '../auth.constants';
 import type { AccessTokenPayload } from '../interfaces/authenticated-user.interface';
 import type { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
@@ -39,6 +44,9 @@ export class JwtAuthGuard implements CanActivate {
     try {
       payload = await this.jwtService.verifyAsync<AccessTokenPayload>(token, {
         secret: accessTokenSecret(),
+        algorithms: [JWT_ALGORITHM],
+        issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE,
       });
     } catch {
       throw new UnauthorizedException('Invalid access token');

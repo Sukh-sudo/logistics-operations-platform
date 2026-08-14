@@ -94,7 +94,11 @@ export class UserService {
     return timingSafeEqual(providedDigest, configuredDigest);
   }
 
-  async createUser(dto: CreateUserDto, requestId?: string) {
+  async createUser(
+    dto: CreateUserDto,
+    requestId?: string,
+    actorUserId?: string,
+  ) {
     const correlationId = requestId ?? randomUUID();
     const employeeNumber = this.normalizeEmployeeNumber(dto.employeeNumber);
     const email = this.normalizeEmail(dto.email);
@@ -136,7 +140,7 @@ export class UserService {
         data: {
           userId: user.id,
           eventType: UserEventType.USER_CREATED,
-          actorUserId: dto.actorUserId,
+          actorUserId,
           correlationId,
           payload: {
             employeeNumber,
@@ -154,7 +158,7 @@ export class UserService {
           data: {
             userId: user.id,
             eventType: UserEventType.USER_ACTIVATED,
-            actorUserId: dto.actorUserId,
+            actorUserId,
             correlationId,
           },
         });
@@ -440,7 +444,11 @@ export class UserService {
     });
   }
 
-  async createRole(dto: CreateRoleDto, requestId?: string) {
+  async createRole(
+    dto: CreateRoleDto,
+    requestId?: string,
+    actorUserId?: string,
+  ) {
     const correlationId = requestId ?? randomUUID();
     const name = this.normalizeRoleName(dto.name);
 
@@ -460,7 +468,7 @@ export class UserService {
           aggregateId: role.id,
           aggregateType: IdentityAggregateType.ROLE,
           eventType: IdentityEventType.ROLE_CREATED,
-          actorUserId: dto.actorUserId,
+          actorUserId,
           correlationId,
           payload: { name: role.name, description: role.description },
         },
@@ -482,7 +490,11 @@ export class UserService {
     });
   }
 
-  async createPermission(dto: CreatePermissionDto, requestId?: string) {
+  async createPermission(
+    dto: CreatePermissionDto,
+    requestId?: string,
+    actorUserId?: string,
+  ) {
     const correlationId = requestId ?? randomUUID();
     const code = this.normalizePermissionCode(dto.code);
 
@@ -502,7 +514,7 @@ export class UserService {
           aggregateId: permission.id,
           aggregateType: IdentityAggregateType.PERMISSION,
           eventType: IdentityEventType.PERMISSION_CREATED,
-          actorUserId: dto.actorUserId,
+          actorUserId,
           correlationId,
           payload: {
             code: permission.code,

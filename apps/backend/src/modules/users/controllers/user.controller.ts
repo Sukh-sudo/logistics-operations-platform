@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { IdentityAggregateType } from '@prisma/client';
-import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
+import type { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
 import { CreatePermissionDto } from '../dto/create-permission.dto';
 import { CreateRoleDto } from '../dto/create-role.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
@@ -19,7 +19,6 @@ import { UpdateUserDto } from '../dto/update-user.dto';
 import {
   AssignPermissionDto,
   AssignRoleDto,
-  UserActionDto,
 } from '../dto/identity-assignment.dto';
 import { UserService } from '../services/user.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -36,9 +35,13 @@ export class UserController {
   @Permissions(PERMISSIONS.USER_MANAGE)
   createUser(
     @Body() dto: CreateUserDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.userService.createUser(dto, request.correlationId ?? request.requestId);
+    return this.userService.createUser(
+      dto,
+      request.correlationId ?? request.requestId,
+      request.user.userId,
+    );
   }
 
   @Get('users')
@@ -58,12 +61,12 @@ export class UserController {
   updateUser(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.userService.updateUser(
       id,
       dto,
-      request.user?.userId,
+      request.user.userId,
       request.correlationId ?? request.requestId,
     );
   }
@@ -72,12 +75,11 @@ export class UserController {
   @Permissions(PERMISSIONS.USER_MANAGE)
   activateUser(
     @Param('id') id: string,
-    @Body() dto: UserActionDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.userService.activateUser(
       id,
-      dto.actorUserId,
+      request.user.userId,
       request.correlationId ?? request.requestId,
     );
   }
@@ -86,12 +88,11 @@ export class UserController {
   @Permissions(PERMISSIONS.USER_MANAGE)
   deactivateUser(
     @Param('id') id: string,
-    @Body() dto: UserActionDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.userService.deactivateUser(
       id,
-      dto.actorUserId,
+      request.user.userId,
       request.correlationId ?? request.requestId,
     );
   }
@@ -101,12 +102,12 @@ export class UserController {
   assignTerminal(
     @Param('id') id: string,
     @Body() dto: AssignTerminalDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.userService.assignTerminal(
       id,
       dto.terminalId,
-      dto.actorUserId,
+      request.user.userId,
       request.correlationId ?? request.requestId,
     );
   }
@@ -116,12 +117,12 @@ export class UserController {
   assignRole(
     @Param('id') id: string,
     @Body() dto: AssignRoleDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.userService.assignRole(
       id,
       dto.roleId,
-      dto.actorUserId,
+      request.user.userId,
       request.correlationId ?? request.requestId,
     );
   }
@@ -131,13 +132,12 @@ export class UserController {
   removeRole(
     @Param('id') id: string,
     @Param('roleId') roleId: string,
-    @Body() dto: UserActionDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.userService.removeRole(
       id,
       roleId,
-      dto.actorUserId,
+      request.user.userId,
       request.correlationId ?? request.requestId,
     );
   }
@@ -152,9 +152,13 @@ export class UserController {
   @Permissions(PERMISSIONS.ROLE_MANAGE)
   createRole(
     @Body() dto: CreateRoleDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.userService.createRole(dto, request.correlationId ?? request.requestId);
+    return this.userService.createRole(
+      dto,
+      request.correlationId ?? request.requestId,
+      request.user.userId,
+    );
   }
 
   @Get('roles')
@@ -177,12 +181,12 @@ export class UserController {
   assignPermission(
     @Param('id') id: string,
     @Body() dto: AssignPermissionDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.userService.assignPermission(
       id,
       dto.permissionId,
-      dto.actorUserId,
+      request.user.userId,
       request.correlationId ?? request.requestId,
     );
   }
@@ -191,9 +195,13 @@ export class UserController {
   @Permissions(PERMISSIONS.ROLE_MANAGE)
   createPermission(
     @Body() dto: CreatePermissionDto,
-    @Req() request: RequestWithId,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.userService.createPermission(dto, request.correlationId ?? request.requestId);
+    return this.userService.createPermission(
+      dto,
+      request.correlationId ?? request.requestId,
+      request.user.userId,
+    );
   }
 
   @Get('permissions')

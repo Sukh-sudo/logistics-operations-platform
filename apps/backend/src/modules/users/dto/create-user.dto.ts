@@ -50,9 +50,4 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(UserStatus)
   status?: UserStatus;
-
-  @ApiPropertyOptional({ description: 'User performing the action' })
-  @IsOptional()
-  @IsString()
-  actorUserId?: string;
 }

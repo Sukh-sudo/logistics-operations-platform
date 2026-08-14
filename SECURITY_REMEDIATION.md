@@ -1,6 +1,6 @@
 # Security remediation register
 
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-14
 
 This register records high-priority findings from the defensive repository
 review. It intentionally describes remediation status without publishing
@@ -16,6 +16,15 @@ exploit instructions or production secrets.
 | Android release builds allowed cleartext API traffic | Remediated | Cleartext is disabled in the main manifest and enabled only by the debug manifest. Release builds use an HTTPS endpoint supplied with `handheldApiBaseUrl`. |
 | Production dependency advisories | Remediated | Direct packages and narrowly scoped transitive overrides were upgraded. `pnpm audit --prod` reports no known vulnerabilities. Keep the audit as a required CI check. |
 | Notification history and resend operations lacked object authorization | Remediated | Authenticated recipients are scoped to notifications whose normalized recipient email matches their current account. Cross-recipient object access returns 404, cross-recipient collection filters return 403, and `system.admin` retains audited management access. Read/resend events record the acting user. |
+
+## Medium-priority findings
+
+| Finding | Status | Resolution |
+| --- | --- | --- |
+| Known JWT fallback and incomplete claim restrictions | Remediated | The signing secret is mandatory and must contain at least 32 characters in every environment. Issuance and verification explicitly use HS256 and validate the configured issuer and audience. |
+| Dashboard tokens stored in browser local storage | Remediated | The refresh token is stored only in an `HttpOnly`, `SameSite=Strict` cookie, the access token remains in memory, and browser auth commands require a custom CSRF-protection header. Native/API JSON token endpoints remain available. |
+| Client-supplied user-management audit identities | Remediated | User-management DTOs no longer accept `actorUserId`; controllers derive it from the verified JWT principal and services persist it on immutable events. |
+| Refresh-token replay lacked family reuse detection | Remediated | Refresh tokens carry a family identifier and rotation markers. Reusing a rotated token atomically marks the family compromised, revokes active successors, increments `tokenVersion`, emits a reuse-detected user event, and updates the user snapshot. |
 
 ## Authorization architecture follow-up
 

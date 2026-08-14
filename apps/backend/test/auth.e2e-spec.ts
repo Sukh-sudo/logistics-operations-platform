@@ -35,6 +35,7 @@ describe('Authentication and authorization (e2e)', () => {
   let app: INestApplication;
   let sequence = 0;
   let administratorAuthorization: string;
+  let administratorUserId: string;
   const unique = (prefix: string) =>
     `${prefix}-${Date.now().toString(36)}-${sequence++}`;
 
@@ -58,6 +59,10 @@ describe('Authentication and authorization (e2e)', () => {
       prisma,
       'auth-admin',
     );
+    const administratorToken = administratorAuthorization.replace('Bearer ', '');
+    administratorUserId = JSON.parse(
+      Buffer.from(administratorToken.split('.')[1], 'base64url').toString('utf8'),
+    ).sub as string;
   });
 
   afterAll(async () => {
@@ -120,6 +125,16 @@ describe('Authentication and authorization (e2e)', () => {
       })
       .expect(201);
     const userId = created.body.user.id;
+    expect(
+      await prisma.userEvent.findFirstOrThrow({
+        where: { userId, eventType: 'USER_CREATED' },
+      }),
+    ).toMatchObject({ actorUserId: administratorUserId });
+    await request(app.getHttpServer())
+      .post(`/users/${userId}/roles`)
+      .set('Authorization', administratorAuthorization)
+      .send({ roleId: role.body.role.id, actorUserId: userId })
+      .expect(400);
     await request(app.getHttpServer())
       .post(`/users/${userId}/roles`)
       .set('Authorization', administratorAuthorization)
@@ -176,10 +191,6 @@ describe('Authentication and authorization (e2e)', () => {
       .post('/auth/refresh')
       .send({ refreshToken: login.body.refreshToken })
       .expect(201);
-    await request(app.getHttpServer())
-      .post('/auth/refresh')
-      .send({ refreshToken: login.body.refreshToken })
-      .expect(401);
 
     await request(app.getHttpServer())
       .post('/auth/change-password')
@@ -218,6 +229,87 @@ describe('Authentication and authorization (e2e)', () => {
         'USER_LOGGED_OUT',
       ]),
     );
+  });
+
+  it('keeps dashboard refresh tokens in an HttpOnly cookie', async () => {
+    const users = app.get(UserService);
+    const email = `${unique('web-cookie')}@example.com`;
+    const password = 'WebCookiePassword!1';
+    await users.createUser({
+      employeeNumber: unique('web-cookie-emp'),
+      email,
+      firstName: 'Web',
+      lastName: 'Cookie',
+      password,
+      status: UserStatus.ACTIVE,
+    });
+
+    const login = await request(app.getHttpServer())
+      .post('/auth/web/login')
+      .set('x-csrf-protection', '1')
+      .send({ email, password })
+      .expect(201);
+    expect(login.body.refreshToken).toBeUndefined();
+    const loginCookie = (login.headers['set-cookie'] as unknown as string[])[0];
+    expect(loginCookie).toContain('refresh_token=');
+    expect(loginCookie).toContain('HttpOnly');
+    expect(loginCookie).toContain('SameSite=Strict');
+
+    await request(app.getHttpServer())
+      .post('/auth/web/refresh')
+      .set('Cookie', loginCookie)
+      .expect(403);
+    const refreshed = await request(app.getHttpServer())
+      .post('/auth/web/refresh')
+      .set('Cookie', loginCookie)
+      .set('x-csrf-protection', '1')
+      .expect(201);
+    expect(refreshed.body.refreshToken).toBeUndefined();
+    expect(refreshed.headers['set-cookie']).toBeDefined();
+  });
+
+  it('detects rotated refresh-token replay and invalidates the successor session', async () => {
+    const users = app.get(UserService);
+    const email = `${unique('replay')}@example.com`;
+    const password = 'ReplayDetection!1';
+    const created = await users.createUser({
+      employeeNumber: unique('replay-emp'),
+      email,
+      firstName: 'Replay',
+      lastName: 'Detection',
+      password,
+      status: UserStatus.ACTIVE,
+    });
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(201);
+    const successor = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: successor.body.refreshToken })
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${successor.body.accessToken}`)
+      .expect(401);
+
+    expect(
+      await prisma.userEvent.count({
+        where: {
+          userId: created.user.id,
+          eventType: 'REFRESH_TOKEN_REUSE_DETECTED',
+        },
+      }),
+    ).toBe(1);
   });
 
   it('enrolls a handheld and invalidates its access and refresh sessions when revoked', async () => {

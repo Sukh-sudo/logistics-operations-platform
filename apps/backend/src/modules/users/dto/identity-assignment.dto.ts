@@ -1,16 +1,11 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class AssignRoleDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
   roleId: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  actorUserId?: string;
 }
 
 export class AssignPermissionDto {
@@ -18,16 +13,4 @@ export class AssignPermissionDto {
   @IsString()
   @IsNotEmpty()
   permissionId: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  actorUserId?: string;
-}
-
-export class UserActionDto {
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  actorUserId?: string;
 }

@@ -166,7 +166,13 @@ Create `apps/backend/.env`:
 DATABASE_URL="postgresql://postgres:postgres@localhost:5433/logistics_platform?schema=public"
 BOOTSTRAP_ADMIN_SECRET="replace-with-a-long-random-bootstrap-secret"
 JWT_ACCESS_SECRET="replace-with-a-long-random-jwt-secret"
+JWT_ISSUER="logistics-operations-platform"
+JWT_AUDIENCE="logistics-platform-clients"
 ```
+
+`JWT_ACCESS_SECRET` is required in every environment and must contain at least
+32 characters. The dashboard keeps access tokens in memory and uses an
+`HttpOnly`, `SameSite=Strict` cookie for refresh sessions.
 
 Prepare the database:
 

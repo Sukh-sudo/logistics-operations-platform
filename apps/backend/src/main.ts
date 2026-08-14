@@ -1,3 +1,4 @@
+import './load-environment';
 import { NestFactory } from '@nestjs/core';
 
 // Swagger imports
@@ -11,8 +12,12 @@ import { AppModule } from './app.module';
 // Import Prisma exception filter
 import { configureApplication } from './configure-application';
 import { logApplicationEvent } from './common/utils/logger';
+import { accessTokenSecret } from './modules/auth/auth.constants';
 
 async function bootstrap() {
+  // Fail during startup in every environment; an accidental NODE_ENV value
+  // must never activate a known signing key.
+  accessTokenSecret();
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({

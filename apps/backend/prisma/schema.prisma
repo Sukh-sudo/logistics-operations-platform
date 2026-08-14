@@ -529,14 +529,18 @@ model RefreshToken {
   id               String          @id @default(cuid())
   userId           String
   handheldDeviceId String?
+  familyId         String
   tokenHash        String          @unique
   expiresAt        DateTime
   revokedAt        DateTime?
+  rotatedAt        DateTime?
+  reuseDetectedAt  DateTime?
   createdAt        DateTime        @default(now())
   user             User            @relation(fields: [userId], references: [id])
   handheldDevice   HandheldDevice? @relation(fields: [handheldDeviceId], references: [id])
 
   @@index([userId, revokedAt])
+  @@index([familyId, revokedAt])
   @@index([handheldDeviceId, revokedAt])
   @@index([expiresAt])
 }
@@ -1126,6 +1130,7 @@ enum UserEventType {
   USER_DEACTIVATED
   USER_AUTHENTICATED
   REFRESH_TOKEN_ROTATED
+  REFRESH_TOKEN_REUSE_DETECTED
   USER_LOGGED_OUT
   PASSWORD_CHANGED
   TERMINAL_ASSIGNED

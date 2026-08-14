@@ -1,18 +1,26 @@
 import type { AuthUserDto, LoginRequestDto, LoginResponseDto } from '@logistics/shared-types';
-import { ACCESS_TOKEN_KEY, apiClient, REFRESH_TOKEN_KEY } from './apiClient';
+import { apiClient, clearSession, refreshAccessToken, setAccessToken } from './apiClient';
+
+type AccessResponse = Omit<LoginResponseDto, 'refreshToken'>;
 
 export const authApi = {
   async login(credentials: LoginRequestDto) {
-    const { data } = await apiClient.post<LoginResponseDto>('/auth/login', credentials);
-    localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+    const { data } = await apiClient.post<AccessResponse>('/auth/web/login', credentials, {
+      headers: { 'x-csrf-protection': '1' },
+    });
+    setAccessToken(data.accessToken);
     return data;
   },
-  async me() { return (await apiClient.get<AuthUserDto>('/auth/me')).data; },
+  async restoreSession() {
+    await refreshAccessToken();
+  },
+  async me() {
+    return (await apiClient.get<AuthUserDto>('/auth/me')).data;
+  },
   async logout() {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (refreshToken) await apiClient.post('/auth/logout', { refreshToken }).catch(() => undefined);
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    await apiClient.post('/auth/web/logout', {}, {
+      headers: { 'x-csrf-protection': '1' },
+    }).catch(() => undefined);
+    clearSession();
   },
 };

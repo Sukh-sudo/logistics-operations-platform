@@ -1,8 +1,25 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 import type { ApiSuccessResponseDto, LoginResponseDto } from '@logistics/shared-types';
 
-export const ACCESS_TOKEN_KEY = 'logistics_access_token';
-export const REFRESH_TOKEN_KEY = 'logistics_refresh_token';
+type AccessResponse = Omit<LoginResponseDto, 'refreshToken'>;
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string) {
+  accessToken = token;
+}
+
+export function clearSession() {
+  accessToken = null;
+}
+
+// Remove sessions created by older dashboard releases. New tokens are never
+// written to Web Storage, but a deployment must also retire existing values.
+try {
+  localStorage.removeItem('logistics_access_token');
+  localStorage.removeItem('logistics_refresh_token');
+} catch {
+  // Storage can be unavailable under restrictive browser privacy policies.
+}
 
 // The dashboard targets the canonical API version by default. Deployments can
 // still override the complete API base URL through the Vite environment.
@@ -11,6 +28,7 @@ const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/
 export const apiClient = axios.create({
   baseURL,
   timeout: 15_000,
+  withCredentials: true,
 });
 
 interface RetryableRequest extends InternalAxiosRequestConfig {
@@ -19,26 +37,24 @@ interface RetryableRequest extends InternalAxiosRequestConfig {
 
 let refreshPromise: Promise<string> | null = null;
 
-function clearSession() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
-
-async function refreshAccessToken() {
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) throw new Error('No refresh token is available');
-
+export async function refreshAccessToken() {
   // Use an interceptor-free request because refresh failures must not recurse.
-  const response = await axios.post<ApiSuccessResponseDto<LoginResponseDto> | LoginResponseDto>(`${baseURL}/auth/refresh`, { refreshToken }, { timeout: 15_000 });
+  const response = await axios.post<ApiSuccessResponseDto<AccessResponse> | AccessResponse>(
+    `${baseURL}/auth/web/refresh`,
+    {},
+    {
+      timeout: 15_000,
+      withCredentials: true,
+      headers: { 'x-csrf-protection': '1' },
+    },
+  );
   const data = 'success' in response.data ? response.data.data : response.data;
-  localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  setAccessToken(data.accessToken);
   return data.accessToken;
 }
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   return config;
 });
 
@@ -52,7 +68,7 @@ apiClient.interceptors.response.use((response) => {
   return response;
 }, async (error) => {
   const request = error.config as RetryableRequest | undefined;
-  const isAuthenticationRequest = request?.url?.includes('/auth/login') || request?.url?.includes('/auth/refresh');
+  const isAuthenticationRequest = request?.url?.includes('/auth/web/login') || request?.url?.includes('/auth/web/refresh');
 
   if (error.response?.status === 401 && request && !request._retry && !isAuthenticationRequest) {
     request._retry = true;

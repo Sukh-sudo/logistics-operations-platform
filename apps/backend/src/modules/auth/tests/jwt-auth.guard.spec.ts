@@ -39,6 +39,14 @@ describe('JwtAuthGuard', () => {
     await expect(
       new JwtAuthGuard(jwt as never, prisma as never, reflector as never).canActivate(context),
     ).resolves.toBe(true);
+    expect(jwt.verifyAsync).toHaveBeenCalledWith(
+      'valid-token',
+      expect.objectContaining({
+        algorithms: ['HS256'],
+        issuer: 'logistics-operations-platform',
+        audience: 'logistics-platform-clients',
+      }),
+    );
     expect((request as never as { user: { roles: string[] } }).user.roles).toEqual([
       'DISPATCHER',
     ]);

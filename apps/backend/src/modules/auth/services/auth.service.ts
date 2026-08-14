@@ -14,6 +14,9 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
+  JWT_ALGORITHM,
+  JWT_AUDIENCE,
+  JWT_ISSUER,
   REFRESH_TOKEN_TTL_MS,
   accessTokenSecret,
 } from '../auth.constants';
@@ -166,9 +169,9 @@ export class AuthService {
     });
   }
 
-  refresh(refreshToken: string, requestId?: string) {
+  async refresh(refreshToken: string, requestId?: string) {
     const tokenHash = this.hashToken(refreshToken);
-    return this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       const stored = await tx.refreshToken.findUnique({
         where: { tokenHash },
         include: {
@@ -179,20 +182,69 @@ export class AuthService {
       const now = new Date();
       if (
         !stored ||
-        stored.revokedAt ||
         stored.expiresAt <= now ||
         stored.user.snapshot?.currentStatus !== UserStatus.ACTIVE ||
         (stored.handheldDeviceId !== null &&
           stored.handheldDevice?.snapshot?.currentStatus !==
             HandheldDeviceStatus.ACTIVE)
       ) {
-        throw new UnauthorizedException('Invalid refresh token');
+        return { kind: 'invalid' as const };
       }
 
-      await tx.refreshToken.update({
-        where: { id: stored.id },
-        data: { revokedAt: now },
+      const compromiseFamily = async () => {
+        // Only the first replay marks the family. This prevents repeated use
+        // of an already detected token from becoming an account-lockout loop.
+        const detected = await tx.refreshToken.updateMany({
+          where: { familyId: stored.familyId, reuseDetectedAt: null },
+          data: { reuseDetectedAt: now },
+        });
+        if (detected.count === 0) return { kind: 'invalid' as const };
+
+        await tx.refreshToken.updateMany({
+          where: { familyId: stored.familyId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+        await tx.user.update({
+          where: { id: stored.user.id },
+          data: { tokenVersion: { increment: 1 } },
+        });
+        const event = await tx.userEvent.create({
+          data: {
+            userId: stored.user.id,
+            eventType: UserEventType.REFRESH_TOKEN_REUSE_DETECTED,
+            actorUserId: stored.user.id,
+            correlationId: requestId ?? randomUUID(),
+            payload: {
+              familyId: stored.familyId,
+              replayedRefreshTokenId: stored.id,
+            },
+          },
+        });
+        await tx.userSnapshot.update({
+          where: { userId: stored.user.id },
+          data: { lastActivityAt: event.createdAt },
+        });
+        return { kind: 'reuse' as const };
+      };
+
+      if (stored.revokedAt) {
+        return stored.rotatedAt
+          ? compromiseFamily()
+          : { kind: 'invalid' as const };
+      }
+
+      const rotation = await tx.refreshToken.updateMany({
+        where: { id: stored.id, revokedAt: null },
+        data: { revokedAt: now, rotatedAt: now },
       });
+      if (rotation.count === 0) {
+        const raced = await tx.refreshToken.findUnique({
+          where: { id: stored.id },
+        });
+        return raced?.rotatedAt
+          ? compromiseFamily()
+          : { kind: 'invalid' as const };
+      }
       const snapshot = stored.user.snapshot;
       const issued = await this.issueTokens(
         stored.user.id,
@@ -201,6 +253,7 @@ export class AuthService {
         snapshot.roleNames,
         snapshot.permissions,
         stored.handheldDeviceId ?? undefined,
+        stored.familyId,
       );
       await tx.refreshToken.create({ data: issued.refreshTokenRecord });
       const event = await tx.userEvent.create({
@@ -231,8 +284,12 @@ export class AuthService {
         });
       }
 
-      return issued.response;
+      return { kind: 'success' as const, response: issued.response };
     });
+    if (outcome.kind !== 'success') {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    return outcome.response;
   }
 
   logout(userId: string, refreshToken: string, requestId?: string) {
@@ -329,6 +386,7 @@ export class AuthService {
     roles: string[],
     permissions: string[],
     handheldDeviceId?: string,
+    refreshTokenFamilyId: string = randomUUID(),
   ) {
     const payload: AccessTokenPayload = {
       sub: userId,
@@ -342,6 +400,9 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: accessTokenSecret(),
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      algorithm: JWT_ALGORITHM,
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     });
     const refreshToken = randomBytes(48).toString('base64url');
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
@@ -355,6 +416,7 @@ export class AuthService {
       },
       refreshTokenRecord: {
         userId,
+        familyId: refreshTokenFamilyId,
         tokenHash: this.hashToken(refreshToken),
         expiresAt,
         ...(handheldDeviceId && { handheldDeviceId }),

@@ -1,21 +1,21 @@
 import axios, { type AxiosAdapter } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ACCESS_TOKEN_KEY, apiClient, REFRESH_TOKEN_KEY } from './apiClient';
+import { apiClient, clearSession, setAccessToken } from './apiClient';
 
 describe('apiClient authentication recovery', () => {
   const originalAdapter = apiClient.defaults.adapter;
 
   afterEach(() => {
     apiClient.defaults.adapter = originalAdapter;
+    clearSession();
     localStorage.clear();
     vi.restoreAllMocks();
   });
 
   it('rotates tokens and retries the original request once after a 401', async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, 'expired-access');
-    localStorage.setItem(REFRESH_TOKEN_KEY, 'refresh-one');
+    setAccessToken('expired-access');
     const refresh = vi.spyOn(axios, 'post').mockResolvedValue({
-      data: { accessToken: 'fresh-access', refreshToken: 'refresh-two', tokenType: 'Bearer', expiresIn: 900 },
+      data: { accessToken: 'fresh-access', tokenType: 'Bearer', expiresIn: 900 },
     });
     const authorizations: unknown[] = [];
 
@@ -31,13 +31,27 @@ describe('apiClient authentication recovery', () => {
 
     expect(response.data.ok).toBe(true);
     expect(refresh).toHaveBeenCalledWith(
-      'http://localhost:3000/api/v1/auth/refresh',
-      { refreshToken: 'refresh-one' },
-      { timeout: 15_000 },
+      'http://localhost:3000/api/v1/auth/web/refresh',
+      {},
+      {
+        timeout: 15_000,
+        withCredentials: true,
+        headers: { 'x-csrf-protection': '1' },
+      },
     );
     expect(authorizations).toEqual(['Bearer expired-access', 'Bearer fresh-access']);
-    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBe('fresh-access');
-    expect(localStorage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh-two');
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('removes tokens persisted by older dashboard releases', async () => {
+    localStorage.setItem('logistics_access_token', 'legacy-access');
+    localStorage.setItem('logistics_refresh_token', 'legacy-refresh');
+    vi.resetModules();
+
+    await import('./apiClient');
+
+    expect(localStorage.getItem('logistics_access_token')).toBeNull();
+    expect(localStorage.getItem('logistics_refresh_token')).toBeNull();
   });
 
   it('unwraps the platform success envelope for domain API services', async () => {

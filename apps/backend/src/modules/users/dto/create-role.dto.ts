@@ -18,9 +18,4 @@ export class CreateRoleDto {
   @IsString()
   @MaxLength(240)
   description?: string;
-
-  @ApiPropertyOptional({ description: 'User performing the action' })
-  @IsOptional()
-  @IsString()
-  actorUserId?: string;
 }

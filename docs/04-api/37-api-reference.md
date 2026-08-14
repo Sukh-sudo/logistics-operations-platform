@@ -41,7 +41,7 @@ Every endpoint follows the same conventions.
 The API is:
 
 - RESTful
-- Stateless
+- Stateless for API clients; browser refresh state is held in a secure cookie
 - Versioned through `/api/v1`, with unversioned compatibility routes
 - Predictable
 - Consistent
@@ -61,6 +61,10 @@ POST /auth/login
 
 POST /auth/refresh
 
+POST /auth/web/login
+
+POST /auth/web/refresh
+
 GET /health
 
 GET /tracking/{shipmentNumber}
@@ -71,6 +75,17 @@ Routes without declared permissions or an authenticated self-service marker
 are denied by default. The administrator bootstrap route is public only while
 the user store is empty and should be disabled operationally by removing
 `BOOTSTRAP_ADMIN_SECRET` after initial provisioning.
+
+`/auth/login` and `/auth/refresh` preserve the JSON token contract for native
+and trusted API clients. The dashboard uses `/auth/web/login` and
+`/auth/web/refresh`; these endpoints return an access token but set the refresh
+token as an `HttpOnly`, `SameSite=Strict` cookie. Browser auth commands require
+`x-csrf-protection: 1`, send credentials with the request, and use protected
+`POST /auth/web/logout` to revoke and clear the cookie.
+
+User, role, and permission administration endpoints reject `actorUserId` in
+request bodies. Audit attribution always comes from the authenticated bearer
+token.
 
 ---
 
