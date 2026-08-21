@@ -6,9 +6,10 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "setup:env": "node scripts/setup-backend-env.mjs",
     "start:dev": "pnpm --filter backend start:dev",
     "test": "turbo run test",
-    "test:e2e": "pnpm --filter backend test:e2e",
+    "test:e2e": "node scripts/test-e2e-clean.mjs",
     "prisma": "pnpm --filter backend exec prisma"
   },
   "keywords": [],

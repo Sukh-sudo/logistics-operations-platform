@@ -157,15 +157,22 @@ load testing, and managed infrastructure before real operational use.
 
 ```bash
 pnpm install
+pnpm setup:env
 docker compose -f infrastructure/docker/docker-compose.yml up -d
 ```
 
-Create `apps/backend/.env`:
+`pnpm setup:env` creates or updates the ignored `apps/backend/.env` from
+`apps/backend/.env.example`. It generates cryptographically random local
+bootstrap and JWT secrets when they are missing and preserves existing values.
+Never commit the generated `.env` file. Production deployments must provide
+their secrets through the deployment platform's secret manager.
+
+The generated configuration includes:
 
 ```dotenv
 DATABASE_URL="postgresql://postgres:postgres@localhost:5433/logistics_platform?schema=public"
-BOOTSTRAP_ADMIN_SECRET="replace-with-a-long-random-bootstrap-secret"
-JWT_ACCESS_SECRET="replace-with-a-long-random-jwt-secret"
+BOOTSTRAP_ADMIN_SECRET="generated-local-secret"
+JWT_ACCESS_SECRET="generated-local-secret"
 JWT_ISSUER="logistics-operations-platform"
 JWT_AUDIENCE="logistics-platform-clients"
 ```
@@ -207,6 +214,12 @@ pnpm test
 pnpm test:e2e
 pnpm build
 ```
+
+`pnpm test:e2e` starts a disposable PostgreSQL 16 container on port `55433`,
+applies every checked-in migration, runs the backend workflow suite, and removes
+the container and its temporary storage even when a test fails. Set
+`E2E_DATABASE_PORT` to use another test-only host port. The command never reads,
+resets, or cleans the development database from `apps/backend/.env`.
 
 </details>
 
