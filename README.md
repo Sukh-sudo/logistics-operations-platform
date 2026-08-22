@@ -221,6 +221,42 @@ the container and its temporary storage even when a test fails. Set
 `E2E_DATABASE_PORT` to use another test-only host port. The command never reads,
 resets, or cleans the development database from `apps/backend/.env`.
 
+Demo-data workflows can execute domain operations at a simulated instant with
+`ApplicationClock.runAt`. The override is scoped to the current asynchronous
+workflow; normal API requests continue to use PostgreSQL and Prisma timestamp
+defaults. Scenario time covers event, snapshot, creation, assignment, loading,
+completion, release, reversal, and unload timestamps while preserving supplied
+planned-trip, device, and GPS times. String instants must include `Z` or an
+explicit UTC offset so generated data cannot depend on the host timezone.
+
+For a presentation-sized local dataset, reset the development schema and run
+the deterministic bulk generator:
+
+```bash
+pnpm prisma migrate reset --force --skip-seed
+pnpm demo:seed -- --count=10000
+pnpm demo:verify
+```
+
+The reset command is destructive and must only target the local
+`logistics_platform` database. The generator refuses non-local database hosts,
+unexpected database names, and non-empty databases. Its default dashboard
+login is `demo.admin@logistics.local` / `DemoAdmin!2026`; set
+`DEMO_ADMIN_PASSWORD` to override the local demo password.
+
+Additional packages can be appended to an existing demo dataset with an
+explicit UTC window that matches dashboard date-filter semantics:
+
+```bash
+pnpm demo:append -- --count=30000 \
+  --from=2025-03-24T00:00:00.000Z \
+  --to=2026-03-24T23:59:59.999Z
+pnpm demo:verify -- --expect=40000 \
+  --from=2025-03-24T00:00:00.000Z \
+  --to=2026-03-24T23:59:59.999Z \
+  --expect-range=30000
+```
+
 </details>
 
 ## Repository map
