@@ -11,13 +11,13 @@ import {
 import { UserStatus } from '@prisma/client';
 
 export class CreateUserDto {
-  @ApiProperty({ example: 'EMP-1001' })
+  @ApiProperty({ example: 'EMP00001' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(40)
   employeeNumber: string;
 
-  @ApiPropertyOptional({ example: 'EMP-BADGE-12345' })
+  @ApiPropertyOptional({ example: 'BADGE000001' })
   @IsOptional()
   @IsString()
   @MaxLength(80)

@@ -130,7 +130,7 @@ Error response
     "message": "Package not found."
   },
   "timestamp": "2026-06-24T15:30:00Z",
-  "path": "/package-events/CON1234567",
+  "path": "/package-events/CON9999999",
   "requestId": "4cbd615e-6ea8-4e97-ad10-e353c6e56d64"
 }
 ```
@@ -379,7 +379,7 @@ and owning terminal:
 ```
 
 The format is `LM|MM` + the owning Terminal's three-letter `terminalCode` + a
-five-digit sequence, such as `LMCAL00001` or `MMEDM00001`.
+five-digit sequence, such as `LMYYC00001` or `MMYEG00001`.
 
 New assignments require `tripId`, `truckId`, `trailerId`, and `driverId`.
 

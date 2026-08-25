@@ -73,7 +73,7 @@ describe('handheld simulator workflow', () => {
     render(<App />);
 
     await user.type(screen.getByLabelText(/badge barcode/i), 'EMP-BADGE-1');
-    await user.type(screen.getByLabelText(/employee id/i), 'EMP-1001');
+    await user.type(screen.getByLabelText(/employee number/i), 'EMP-1001');
     await user.click(screen.getByRole('button', { name: /authenticate/i }));
     expect(await screen.findByText(/good shift, alex/i)).toBeTruthy();
     const loginRequest = JSON.parse(fetchMock.mock.calls[0][1].body as string);
@@ -151,7 +151,7 @@ describe('handheld simulator workflow', () => {
     render(<App />);
 
     await user.type(screen.getByLabelText(/badge barcode/i), 'EMP-BADGE-1');
-    await user.type(screen.getByLabelText(/employee id/i), 'EMP-1001');
+    await user.type(screen.getByLabelText(/employee number/i), 'EMP-1001');
     await user.click(screen.getByRole('button', { name: /authenticate/i }));
     await screen.findByText(/good shift, alex/i);
     await user.click(screen.getByRole('button', { name: /online/i }));
@@ -194,7 +194,7 @@ describe('handheld simulator workflow', () => {
     render(<App />);
 
     await user.type(screen.getByLabelText(/badge barcode/i), 'EMP-BADGE-1');
-    await user.type(screen.getByLabelText(/employee id/i), 'EMP-1001');
+    await user.type(screen.getByLabelText(/employee number/i), 'EMP-1001');
     await user.click(screen.getByRole('button', { name: /authenticate/i }));
     await user.click((await screen.findByText(/^Load trailer$/)).closest('button')!);
     await user.type(await screen.findByLabelText(/trailer barcode/i), 'TRLR123456');
@@ -243,7 +243,7 @@ describe('handheld simulator workflow', () => {
     render(<App />);
 
     await user.type(screen.getByLabelText(/badge barcode/i), 'EMP-BADGE-1');
-    await user.type(screen.getByLabelText(/employee id/i), 'EMP-1001');
+    await user.type(screen.getByLabelText(/employee number/i), 'EMP-1001');
     await user.click(screen.getByRole('button', { name: /authenticate/i }));
     await user.click((await screen.findByText(/^Load container$/)).closest('button')!);
 
@@ -281,7 +281,7 @@ describe('handheld simulator workflow', () => {
     render(<App />);
 
     await user.type(screen.getByLabelText(/badge barcode/i), 'EMP-BADGE-1');
-    await user.type(screen.getByLabelText(/employee id/i), 'EMP-1001');
+    await user.type(screen.getByLabelText(/employee number/i), 'EMP-1001');
     await user.click(screen.getByRole('button', { name: /authenticate/i }));
     await user.click((await screen.findByText(/^Load trailer$/)).closest('button')!);
 

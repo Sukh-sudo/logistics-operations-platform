@@ -4,7 +4,7 @@ import { TRAILER_IDENTIFIER_PATTERN } from '../../../common/domain/asset-identif
 
 export class CreateTrailerDto {
   @ApiProperty({
-    example: 'TRLR123456',
+    example: 'TRLR000121',
     description: 'Unique 10-character trailer barcode',})
   @IsString()
   @Matches(TRAILER_IDENTIFIER_PATTERN, {

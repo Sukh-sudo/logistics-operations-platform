@@ -75,7 +75,7 @@ export function validateScanInput({
     !TRUCK_UNIT_PATTERN.test(truckUnitNumber.trim().toUpperCase())
   ) {
     errors.truckUnitNumber =
-      'Truck unit must use LM or MM, a 3-letter terminal code, and 5 digits (for example LMCAL00001).';
+      'Truck unit must use LM or MM, a 3-letter terminal code, and 5 digits (for example LMYYC00001).';
   }
 
   return errors;

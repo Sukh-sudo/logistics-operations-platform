@@ -4,7 +4,7 @@ import { CONTAINER_IDENTIFIER_PATTERN } from '../../../common/domain/asset-ident
 
 export class CreateContainerDto {
   @ApiProperty({
-    example: 'CON1234567',
+    example: 'CON0800501',
     description: 'Unique 10-character barcode whose prefix identifies the accepted package type',
   })
   @IsString()

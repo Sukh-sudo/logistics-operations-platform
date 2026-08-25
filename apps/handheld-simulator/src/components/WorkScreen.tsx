@@ -12,6 +12,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { IDENTIFIER_EXAMPLES } from '../domain/identifierExamples';
 import type {
   HandheldAction,
   OperationalContext,
@@ -151,14 +152,14 @@ export function WorkScreen({
                   clearValidationError('trailerBarcode');
                   onContextChange({ ...context, trailerBarcode: event.target.value.toUpperCase() });
                 }}
-                placeholder="TRLR123456"
+                placeholder={IDENTIFIER_EXAMPLES.trailerBarcode}
               />
               {validationErrors.trailerBarcode && <small className="field-error">{validationErrors.trailerBarcode}</small>}
             </label>
           ) : (
             <div className="context-grid">
-              <label><span>Route code</span><input aria-label="Route code" value={context.routeCode} onChange={(event) => onContextChange({ ...context, routeCode: event.target.value.toUpperCase() })} placeholder="RTE-101" /></label>
-              <label><span>Truck unit</span><input aria-label="Truck unit" aria-invalid={Boolean(validationErrors.truckUnitNumber)} value={context.truckUnitNumber} onChange={(event) => { clearValidationError('truckUnitNumber'); onContextChange({ ...context, truckUnitNumber: event.target.value.toUpperCase() }); }} placeholder="LMCAL00001" />{validationErrors.truckUnitNumber && <small className="field-error">{validationErrors.truckUnitNumber}</small>}</label>
+              <label><span>Route code</span><input aria-label="Route code" value={context.routeCode} onChange={(event) => onContextChange({ ...context, routeCode: event.target.value.toUpperCase() })} placeholder={IDENTIFIER_EXAMPLES.routeCode} /></label>
+              <label><span>Truck unit</span><input aria-label="Truck unit" aria-invalid={Boolean(validationErrors.truckUnitNumber)} value={context.truckUnitNumber} onChange={(event) => { clearValidationError('truckUnitNumber'); onContextChange({ ...context, truckUnitNumber: event.target.value.toUpperCase() }); }} placeholder={IDENTIFIER_EXAMPLES.truckUnitNumber} />{validationErrors.truckUnitNumber && <small className="field-error">{validationErrors.truckUnitNumber}</small>}</label>
             </div>
           )}
           {recentEvents.some((event) => event.syncState === 'PENDING' || event.syncState === 'PENDING_VALIDATION') && (
@@ -201,7 +202,9 @@ export function WorkScreen({
                     clearValidationError('identifier');
                     setIdentifier(event.target.value.toUpperCase());
                   }}
-                  placeholder="CON1234567"
+                  placeholder={definition.identifier === 'PACKAGE'
+                    ? IDENTIFIER_EXAMPLES.packageTrackingNumber
+                    : IDENTIFIER_EXAMPLES.containerBarcode}
                 />
               </div>
               {validationErrors.identifier && <small className="field-error">{validationErrors.identifier}</small>}
@@ -210,7 +213,7 @@ export function WorkScreen({
           {definition.needsContainer && definition.identifier === 'PACKAGE' && (
             <label>
               <span>Container barcode</span>
-              <div className="scan-input"><Box /><input aria-label="Container barcode" aria-invalid={Boolean(validationErrors.containerBarcode)} value={containerBarcode} onChange={(event) => { clearValidationError('containerBarcode'); setContainerBarcode(event.target.value.toUpperCase()); }} placeholder="CON1234567" /></div>
+              <div className="scan-input"><Box /><input aria-label="Container barcode" aria-invalid={Boolean(validationErrors.containerBarcode)} value={containerBarcode} onChange={(event) => { clearValidationError('containerBarcode'); setContainerBarcode(event.target.value.toUpperCase()); }} placeholder={IDENTIFIER_EXAMPLES.containerBarcode} /></div>
               {validationErrors.containerBarcode && <small className="field-error">{validationErrors.containerBarcode}</small>}
             </label>
           )}

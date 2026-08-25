@@ -7,6 +7,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { IDENTIFIER_EXAMPLES } from '../domain/identifierExamples';
 import type { Bootstrap, PackageLookup, TaskType, WorkSession } from '../domain/types';
 import { visibleTasks } from '../domain/workflows';
 
@@ -111,7 +112,7 @@ export function HomeScreen({
             aria-label="Tracking number lookup"
             value={lookup}
             onChange={(event) => setLookup(event.target.value)}
-            placeholder="Enter tracking number"
+            placeholder={IDENTIFIER_EXAMPLES.packageTrackingNumber}
             required
           />
           <button disabled={!online}>Look up</button>

@@ -1,5 +1,6 @@
 import { BadgeCheck, ScanLine, ShieldCheck } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
+import { IDENTIFIER_EXAMPLES } from '../domain/identifierExamples';
 
 interface LoginScreenProps {
   online: boolean;
@@ -107,18 +108,18 @@ export function LoginScreen({
                 required
                 value={badgeBarcode}
                 onChange={(event) => setBadgeBarcode(event.target.value)}
-                placeholder="EMP-BADGE-12345"
+                placeholder={IDENTIFIER_EXAMPLES.badgeBarcode}
                 autoComplete="off"
               />
             </div>
           </label>
           <label>
-            <span>Employee ID</span>
+            <span>Employee number</span>
             <input
               required
               value={employeeId}
               onChange={(event) => setEmployeeId(event.target.value)}
-              placeholder="EMP-1001"
+              placeholder={IDENTIFIER_EXAMPLES.employeeNumber}
               autoComplete="username"
             />
           </label>

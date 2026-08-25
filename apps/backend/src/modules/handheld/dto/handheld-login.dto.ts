@@ -2,13 +2,13 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class HandheldLoginDto {
-  @ApiProperty({ example: 'EMP-BADGE-12345' })
+  @ApiProperty({ example: 'BADGE000001' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
   badgeBarcode: string;
 
-  @ApiProperty({ example: 'EMP-1001' })
+  @ApiProperty({ example: 'EMP00001' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(40)

@@ -374,8 +374,8 @@ Login request:
 
 ```json
 {
-  "badgeBarcode": "EMP-BADGE-12345",
-  "employeeId": "12345",
+  "badgeBarcode": "BADGE000001",
+  "employeeId": "EMP00001",
   "deviceId": "installation-uuid",
   "deviceCredential": "stored-and-supplied-automatically"
 }

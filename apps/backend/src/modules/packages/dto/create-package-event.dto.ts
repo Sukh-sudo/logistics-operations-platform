@@ -13,7 +13,7 @@ import { PACKAGE_IDENTIFIER_PATTERN } from '../../../common/domain/asset-identif
 
 export class CreatePackageEventDto {
   @ApiProperty({
-    example: 'CON1234567',
+    example: 'CON0000002',
     description: 'Unique 10-character tracking number whose prefix identifies the package type',
   })
   @IsString()
