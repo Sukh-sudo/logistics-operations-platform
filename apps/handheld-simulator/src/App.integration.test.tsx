@@ -207,6 +207,61 @@ describe('handheld simulator workflow', () => {
     expect(localStorage.getItem('handheld.outbox')).not.toContain('CON12345');
   });
 
+  it('closes a container without sending unrelated stored trailer context', async () => {
+    const containerSession = { ...session, taskType: 'CONTAINER_LOAD' };
+    localStorage.setItem('handheld.context', JSON.stringify({
+      trailerBarcode: 'TRL-52142',
+      routeCode: '',
+      truckUnitNumber: '',
+    }));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresIn: 900,
+        tokenType: 'Bearer',
+        employee: bootstrap.employee,
+        terminal: bootstrap.terminal,
+      }))
+      .mockResolvedValueOnce(response(bootstrap))
+      .mockResolvedValueOnce(response({
+        session: containerSession,
+        snapshot: containerSession.snapshot,
+      }))
+      .mockResolvedValueOnce(response({
+        id: 'receipt-container-close',
+        clientEventId: '00000000-0000-4000-8000-000000000002',
+        status: 'ACCEPTED',
+        resultStatus: 'ACCEPTED',
+        serverEventId: 'container-event-1',
+        code: 'SCAN_ACCEPTED',
+        message: 'Container closed',
+        exceptionFlags: [],
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(screen.getByLabelText(/badge barcode/i), 'EMP-BADGE-1');
+    await user.type(screen.getByLabelText(/employee id/i), 'EMP-1001');
+    await user.click(screen.getByRole('button', { name: /authenticate/i }));
+    await user.click((await screen.findByText(/^Load container$/)).closest('button')!);
+
+    expect(await screen.findByText(/container load/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/trailer barcode/i)).toBeNull();
+    await user.click(screen.getByRole('button', { name: /^close container$/i }));
+    await user.type(screen.getByLabelText(/container barcode/i), 'CON0000001');
+    await user.click(screen.getByRole('button', { name: /record scan/i }));
+
+    expect(await screen.findAllByText('Container closed')).toHaveLength(2);
+    const scanRequest = JSON.parse(fetchMock.mock.calls[3][1].body as string);
+    expect(scanRequest).toMatchObject({
+      action: 'CLOSE_CONTAINER',
+      containerBarcode: 'CON0000001',
+    });
+    expect(scanRequest).not.toHaveProperty('trailerBarcode');
+  });
+
   it('starts a current-device task instead of reopening another device session', async () => {
     const otherDeviceSession = { ...session, deviceId: 'other-device' };
     const otherDeviceBootstrap = { ...bootstrap, activeSessions: [otherDeviceSession] };

@@ -112,6 +112,8 @@ export function WorkScreen({
     definition.needsContainer &&
     definition.identifier === 'PACKAGE' &&
     !containerBarcode.trim();
+  const needsTrailerContext = task.actions.some((candidate) => candidate.needsTrailer);
+  const needsRouteContext = task.actions.some((candidate) => candidate.needsRoute);
 
   return (
     <div className="screen-content work-screen">
@@ -129,16 +131,16 @@ export function WorkScreen({
         <StateBadge state={session.snapshot.currentState} />
       </section>
 
-      {(task.category === 'TRAILER_OPERATIONS' || task.category === 'LAST_MILE_LOADING' || task.category === 'COURIER_DELIVERY') && (
+      {(needsTrailerContext || needsRouteContext) && (
         <section className="context-card">
           <div className="context-heading">
-            {task.category === 'TRAILER_OPERATIONS' ? <Truck /> : <MapPinned />}
+            {needsTrailerContext ? <Truck /> : <MapPinned />}
             <div>
               <p className="eyebrow">CURRENT CONTEXT</p>
-              <h3>{task.category === 'TRAILER_OPERATIONS' ? 'Selected trailer' : 'Selected route & truck'}</h3>
+              <h3>{needsTrailerContext ? 'Selected trailer' : 'Selected route & truck'}</h3>
             </div>
           </div>
-          {task.category === 'TRAILER_OPERATIONS' ? (
+          {needsTrailerContext ? (
             <label>
               <span>Trailer barcode</span>
               <input

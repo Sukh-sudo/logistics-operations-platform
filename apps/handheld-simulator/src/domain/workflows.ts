@@ -116,6 +116,14 @@ export function taskDefinition(type: TaskType) {
   return task;
 }
 
+export function actionDefinition(value: HandheldAction) {
+  const definition = TASKS
+    .flatMap((task) => task.actions)
+    .find((candidate) => candidate.value === value);
+  if (!definition) throw new Error(`Unknown handheld action: ${value}`);
+  return definition;
+}
+
 export function visibleTasks(authorized: string[]) {
   return TASKS.filter((task) => authorized.includes(task.category));
 }

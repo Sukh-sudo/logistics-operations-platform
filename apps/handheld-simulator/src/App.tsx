@@ -23,6 +23,7 @@ import type {
   TaskType,
   WorkSession,
 } from './domain/types';
+import { actionDefinition } from './domain/workflows';
 import { ApiError, handheldApi } from './services/handheldApi';
 import {
   bootstrapStorage,
@@ -501,6 +502,7 @@ function buildCommand(
   context: OperationalContext,
   location?: GeolocationCoordinates,
 ): ScanCommand {
+  const definition = actionDefinition(action);
   const isContainerIdentifier =
     action.includes('CONTAINER_TO_TRAILER') ||
     action === 'UNLOAD_CONTAINER_FROM_TRAILER' ||
@@ -518,9 +520,15 @@ function buildCommand(
         ? { trackingNumber: identifier.trim().toUpperCase() }
         : {}),
     ...(pairedContainer && { containerBarcode: pairedContainer.trim().toUpperCase() }),
-    ...(context.trailerBarcode && { trailerBarcode: context.trailerBarcode.trim().toUpperCase() }),
-    ...(context.routeCode && { routeCode: context.routeCode.trim().toUpperCase() }),
-    ...(context.truckUnitNumber && { truckUnitNumber: context.truckUnitNumber.trim().toUpperCase() }),
+    ...(definition.needsTrailer && context.trailerBarcode && {
+      trailerBarcode: context.trailerBarcode.trim().toUpperCase(),
+    }),
+    ...(definition.needsRoute && context.routeCode && {
+      routeCode: context.routeCode.trim().toUpperCase(),
+    }),
+    ...(definition.needsRoute && context.truckUnitNumber && {
+      truckUnitNumber: context.truckUnitNumber.trim().toUpperCase(),
+    }),
   };
   if (location) {
     command.latitude = location.latitude;
