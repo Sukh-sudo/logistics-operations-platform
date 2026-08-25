@@ -8,7 +8,7 @@ import type {
   TaskType,
   WorkSession,
 } from '../domain/types';
-import { tokenStorage } from '../storage/deviceStorage';
+import { clearAuthentication, tokenStorage } from '../storage/deviceStorage';
 
 interface SuccessEnvelope<T> {
   success: true;
@@ -22,6 +22,7 @@ interface ErrorEnvelope {
 }
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/mobile/v1';
+let refreshInFlight: Promise<AuthTokens> | null = null;
 
 export class ApiError extends Error {
   constructor(
@@ -65,23 +66,57 @@ async function rawRequest<T>(
   return decode<T>(response);
 }
 
-async function authorized<T>(path: string, init: RequestInit = {}): Promise<T> {
-  let tokens = tokenStorage.get();
-  if (!tokens) throw new ApiError('Sign in is required.', 401);
+type AuthorizedInit = RequestInit | ((tokens: AuthTokens) => RequestInit);
+
+async function authorized<T>(path: string, init: AuthorizedInit = {}): Promise<T> {
+  const requestTokens = tokenStorage.get();
+  if (!requestTokens) throw new ApiError('Sign in is required.', 401);
   try {
-    return await rawRequest<T>(path, init, tokens.accessToken);
+    return await rawRequest<T>(path, resolveInit(init, requestTokens), requestTokens.accessToken);
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 401 || path === '/auth/refresh') {
       throw error;
     }
-    // Refresh rotation happens once, then the original idempotent request is retried.
-    tokens = await rawRequest<AuthTokens>('/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-    });
-    tokenStorage.set(tokens);
-    return rawRequest<T>(path, init, tokens.accessToken);
+
+    const currentTokens = tokenStorage.get();
+    if (!currentTokens) throw new ApiError('Sign in is required.', 401);
+
+    // Another request may already have rotated the one-use refresh token while
+    // this request was in flight. Retry with its new access token instead of
+    // replaying the old refresh token and invalidating the token family.
+    const tokens = currentTokens.refreshToken !== requestTokens.refreshToken
+      ? currentTokens
+      : await refreshTokens(currentTokens.refreshToken);
+    return rawRequest<T>(path, resolveInit(init, tokens), tokens.accessToken);
   }
+}
+
+function resolveInit(init: AuthorizedInit, tokens: AuthTokens) {
+  return typeof init === 'function' ? init(tokens) : init;
+}
+
+function refreshTokens(refreshToken: string): Promise<AuthTokens> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = rawRequest<AuthTokens>('/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken }),
+  })
+    .then((tokens) => {
+      tokenStorage.set(tokens);
+      return tokens;
+    })
+    .catch((error) => {
+      if (error instanceof ApiError && error.status === 401) {
+        clearAuthentication();
+        throw new ApiError('Your session expired. Sign in again.', 401, error.code);
+      }
+      throw error;
+    })
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
 }
 
 export const handheldApi = {
@@ -96,11 +131,11 @@ export const handheldApi = {
       body: JSON.stringify({ badgeBarcode, employeeId, deviceId, deviceCredential }),
     }),
   bootstrap: () => authorized<Bootstrap>('/bootstrap'),
-  logout: (refreshToken: string) =>
-    authorized<{ loggedOut: true }>('/auth/logout', {
+  logout: () =>
+    authorized<{ loggedOut: true }>('/auth/logout', (tokens) => ({
       method: 'POST',
-      body: JSON.stringify({ refreshToken }),
-    }),
+      body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+    })),
   startSession: (taskType: TaskType, deviceId: string, online: boolean) =>
     authorized<{ session: WorkSession; snapshot: WorkSession['snapshot'] }>(
       '/work-sessions',

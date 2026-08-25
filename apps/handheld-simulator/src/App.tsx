@@ -135,7 +135,7 @@ export function App() {
     setBusy(true);
     const tokens = tokenStorage.get();
     try {
-      if (online && tokens) await handheldApi.logout(tokens.refreshToken);
+      if (online && tokens) await handheldApi.logout();
     } catch {
       // Local sign-out still protects cached credentials if the API is unavailable.
     } finally {
