@@ -11,6 +11,10 @@ coverage
 !/docs/ANDROID_HANDHELD_ARCHITECTURE_AND_IMPLEMENTATION_PLAN.md
 !/docs/02-modules/handheld-module.md
 !/docs/04-api/37-api-reference.md
+!/docs/ARCHITECTURE_REPORT.md
+!/docs/TEST_CASES.md
+!/docs/VALIDATION_REPORT.md
+!/docs/USER_GUIDE.md
 
 # Local tooling and repository backups
 .continue/
