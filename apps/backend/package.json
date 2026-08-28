@@ -10,6 +10,7 @@
     "start:prod": "node dist/src/main",
     "demo:seed": "node prisma/demo-seed.mjs",
     "demo:append": "node prisma/demo-seed.mjs --append",
+    "demo:close-pending": "node prisma/demo-seed.mjs --close-pending",
     "demo:summary": "node prisma/demo-seed.mjs --summary",
     "demo:verify": "node prisma/demo-seed.mjs --verify",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

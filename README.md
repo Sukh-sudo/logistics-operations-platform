@@ -257,6 +257,21 @@ pnpm demo:verify -- --expect=40000 \
   --expect-range=30000
 ```
 
+To reconcile the existing 40,000-package demo dataset (10,000 delivered and
+30,000 pending) and then create 2,000 active packages spread across the current
+UTC week, run the guarded in-place workflow below. It appends delivery events,
+closes package relationships and eligible shipments, preserves cancelled
+shipment status, and refuses to run if the pending count differs from the
+explicit expectation:
+
+```bash
+pnpm prisma migrate deploy
+pnpm demo:close-pending -- --expect-pending=30000
+pnpm demo:append -- --count=2000 --circulation-only --this-week
+pnpm demo:verify -- --expect=42000 --circulation-only --this-week \
+  --expect-circulation=2000
+```
+
 </details>
 
 ## Repository map

@@ -9,6 +9,7 @@
     "setup:env": "node scripts/setup-backend-env.mjs",
     "demo:seed": "pnpm --filter backend demo:seed",
     "demo:append": "pnpm --filter backend demo:append",
+    "demo:close-pending": "pnpm --filter backend demo:close-pending",
     "demo:summary": "pnpm --filter backend demo:summary",
     "demo:verify": "pnpm --filter backend demo:verify",
     "start:dev": "pnpm --filter backend start:dev",
