@@ -10,6 +10,15 @@ export const useRecentEvents = (filters: DashboardFilters = emptyDashboardFilter
   return useQuery({ queryKey: ['dashboard', 'events', query], queryFn: () => dashboardApi.events(query), placeholderData: keepPreviousData });
 };
 export const useDashboardTerminals = () => useQuery({ queryKey: ['dashboard', 'terminals'], queryFn: dashboardApi.terminals });
+export const useTerminalPerformance = (filters: DashboardFilters = emptyDashboardFilters) => {
+  const query = toDashboardQuery(filters);
+  const params = {
+    ...(query.fromDate && { fromDate: query.fromDate }),
+    ...(query.toDate && { toDate: query.toDate }),
+    ...(query.terminalId && { terminalId: query.terminalId }),
+  };
+  return useQuery({ queryKey: ['dashboard', 'terminal-performance', params], queryFn: () => dashboardApi.terminalPerformance(params), placeholderData: keepPreviousData });
+};
 export const useHandheldKpis = (filters: DashboardFilters = emptyDashboardFilters) => {
   const params = {
     ...(filters.terminalId && { terminalId: Number(filters.terminalId) }),

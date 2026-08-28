@@ -105,7 +105,7 @@ describe('OperationsPage integration', () => {
     await user.selectOptions(screen.getByLabelText('Shipment destination'), '2');
     await user.type(screen.getByLabelText('Shipment package numbers'), 'con1234567, mail123456');
     await user.click(screen.getByRole('button', { name: 'Create shipment' }));
-    await waitFor(() => expect(shipmentApi.create).toHaveBeenCalledWith({ shipmentNumber: 'SHIP-100', originTerminalId: 1, destinationTerminalId: 2, packageTrackingNumbers: ['CON1234567', 'MAIL123456'] }));
+    await waitFor(() => expect(shipmentApi.create).toHaveBeenCalledWith({ shipmentNumber: 'SHIP-100', originTerminalId: 1, destinationTerminalId: 2, transitDays: 1, packageTrackingNumbers: ['CON1234567', 'MAIL123456'] }));
 
     await user.type(screen.getByLabelText('Shipment ID'), 'shipment-1');
     await user.type(screen.getByLabelText('Shipment action value'), 'dg12345678');

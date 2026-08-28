@@ -49,6 +49,8 @@ export class TrackingService {
       shipmentNumber: shipment.shipmentNumber,
       referenceNumber: shipment.referenceNumber,
       status: shipment.snapshot.currentStatus,
+      transitDays: shipment.transitDays,
+      estimatedDeliveryAt: shipment.estimatedDeliveryAt,
       origin: this.terminalSummary(shipment.originTerminal),
       destination: this.terminalSummary(shipment.destinationTerminal),
       currentTerminal: currentTerminal

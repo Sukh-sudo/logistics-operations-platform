@@ -16,6 +16,30 @@ export interface DashboardPackageDto {
   destinationTerminalId: number | null;
 }
 export interface DashboardTerminalOptionDto { id: number; terminalCode: string; name: string; city: string; }
+export interface TerminalPerformanceDto {
+  id: number;
+  terminalCode: string;
+  name: string;
+  city: string;
+  province: string;
+  currentStatus: string | null;
+  inventory: { packages: number; containers: number; trailers: number; employees: number };
+  metrics: {
+    packagesProcessed: number;
+    deliveredPackages: number;
+    committedDeliveries: number;
+    onTimeDeliveries: number;
+    deliveryOnTimePerformance: number | null;
+    lateDeliveries: number;
+    deliveryAttempts: number;
+    totalArrivals: number;
+    onTimeArrivals: number;
+    onTimePerformance: number | null;
+    lateArrivals: number;
+    inboundTrailers: number;
+    outboundTrailers: number;
+  };
+}
 export interface HandheldKpiDto {
   acceptedPackages: number;
   rejectedScans: number;

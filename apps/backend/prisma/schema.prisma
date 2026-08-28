@@ -170,6 +170,8 @@ model Shipment {
   status                ShipmentStatus    @default(CREATED)
   originTerminalId      Int
   destinationTerminalId Int
+  transitDays           Int?
+  estimatedDeliveryAt   DateTime?
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
   originTerminal        Terminal          @relation("ShipmentOriginTerminal", fields: [originTerminalId], references: [id])

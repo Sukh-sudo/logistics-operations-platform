@@ -23,10 +23,12 @@ describe('ShipmentService', () => {
     const createdAt = new Date();
     tx.terminal.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }]); tx.shipment.findUnique.mockResolvedValue(null);
     tx.packageSnapshot.findMany.mockResolvedValue([{ id: 'p1', trackingNumber: 'PKG-1', currentStatus: PackageStatus.RECEIVED }]);
-    tx.shipmentPackage.findMany.mockResolvedValue([]); tx.shipment.create.mockResolvedValue({ id: 'sh1', status: ShipmentStatus.PACKAGES_ASSIGNED });
+    tx.shipmentPackage.findMany.mockResolvedValue([]); tx.shipment.create.mockResolvedValue({ id: 'sh1', status: ShipmentStatus.PACKAGES_ASSIGNED, createdAt });
+    tx.shipment.update.mockResolvedValue({ id: 'sh1', status: ShipmentStatus.PACKAGES_ASSIGNED, transitDays: 2, estimatedDeliveryAt: new Date(createdAt.getTime() + 172800000) });
     tx.shipmentEvent.create.mockResolvedValue({ eventType: ShipmentEventType.SHIPMENT_CREATED, createdAt });
     tx.shipmentSnapshot.create.mockResolvedValue({ packageCount: 1, currentStatus: ShipmentStatus.PACKAGES_ASSIGNED });
-    const result = await service.createShipment({ shipmentNumber: 'S-1', originTerminalId: 1, destinationTerminalId: 2, packageTrackingNumbers: ['PKG-1'] });
+    const result = await service.createShipment({ shipmentNumber: 'S-1', originTerminalId: 1, destinationTerminalId: 2, transitDays: 2, packageTrackingNumbers: ['PKG-1'] });
+    expect(tx.shipment.update).toHaveBeenCalledWith({ where: { id: 'sh1' }, data: { estimatedDeliveryAt: new Date(createdAt.getTime() + 172800000) } });
     expect(tx.shipmentPackage.createMany).toHaveBeenCalledWith({ data: [{ shipmentId: 'sh1', packageId: 'p1' }] });
     expect(tx.shipmentEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: ShipmentEventType.SHIPMENT_CREATED }) });
     expect(result.snapshot.packageCount).toBe(1);
@@ -34,7 +36,7 @@ describe('ShipmentService', () => {
   });
 
   it('requires distinct origin and destination terminals', async () => {
-    await expect(service.createShipment({ shipmentNumber: 'S-2', originTerminalId: 1, destinationTerminalId: 1, packageTrackingNumbers: ['PKG-1'] })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.createShipment({ shipmentNumber: 'S-2', originTerminalId: 1, destinationTerminalId: 1, transitDays: 1, packageTrackingNumbers: ['PKG-1'] })).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('projects package delivery into a shipment event and snapshot', async () => {

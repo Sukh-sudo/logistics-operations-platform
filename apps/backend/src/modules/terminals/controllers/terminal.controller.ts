@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { RequestWithId } from '../../../common/middleware/request-id.middleware';
@@ -17,6 +18,7 @@ import {
   TransferTerminalAssetDto,
 } from '../dto/terminal-asset.dto';
 import { UpdateTerminalDto } from '../dto/update-terminal.dto';
+import { TerminalPerformanceQueryDto } from '../dto/terminal-performance-query.dto';
 import { TerminalService } from '../services/terminal.service';
 
 @Controller('terminals')
@@ -37,6 +39,11 @@ export class TerminalController {
     return this.terminalService.getTerminals();
   }
 
+  @Get('performance')
+  getPerformance(@Query() query: TerminalPerformanceQueryDto) {
+    return this.terminalService.getPerformance(query);
+  }
+
   @Get(':id/inventory')
   getInventory(@Param('id', ParseIntPipe) id: number) {
     return this.terminalService.getInventory(id);
@@ -55,6 +62,19 @@ export class TerminalController {
   @Get(':id/operations')
   getOperations(@Param('id', ParseIntPipe) id: number) {
     return this.terminalService.getOperations(id);
+  }
+
+  @Get(':id/employees')
+  getEmployees(@Param('id', ParseIntPipe) id: number) {
+    return this.terminalService.getEmployees(id);
+  }
+
+  @Get(':id/movements')
+  getMovements(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: TerminalPerformanceQueryDto,
+  ) {
+    return this.terminalService.getMovements(id, query);
   }
 
   @Get(':id/history')

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  PackageEventType,
   Prisma,
   TerminalAssetType,
   TerminalEventType,
@@ -17,6 +18,7 @@ import {
   ReceiveTerminalAssetDto,
   TransferTerminalAssetDto,
 } from '../dto/terminal-asset.dto';
+import { TerminalPerformanceQueryDto } from '../dto/terminal-performance-query.dto';
 import { UpdateTerminalDto } from '../dto/update-terminal.dto';
 
 type TransactionClient = Prisma.TransactionClient;
@@ -160,6 +162,223 @@ export class TerminalService {
       include: { snapshot: true },
       orderBy: { terminalCode: 'asc' },
     });
+  }
+
+  async getPerformance(filters: TerminalPerformanceQueryDto = {}) {
+    const dateRange = this.activityDateRange(filters);
+    const [terminals, packageEvents, tripStops] = await Promise.all([
+      this.prisma.terminal.findMany({
+        where: filters.terminalId === undefined ? undefined : { id: filters.terminalId },
+        include: { snapshot: true },
+        orderBy: { terminalCode: 'asc' },
+      }),
+      this.prisma.packageEvent.findMany({
+        where: {
+          terminalId: filters.terminalId ?? { not: null },
+          ...(dateRange && { createdAt: dateRange }),
+        },
+        select: {
+          terminalId: true,
+          packageId: true,
+          eventType: true,
+          createdAt: true,
+          package: {
+            select: {
+              shipmentPackages: {
+                select: {
+                  shipment: { select: { estimatedDeliveryAt: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.tripStop.findMany({
+        where: {
+          ...(filters.terminalId !== undefined && { terminalId: filters.terminalId }),
+          OR: [
+            { actualArrival: dateRange ?? { not: null } },
+            { actualDeparture: dateRange ?? { not: null } },
+          ],
+        },
+        select: {
+          terminalId: true,
+          plannedArrival: true,
+          actualArrival: true,
+          actualDeparture: true,
+          delayMinutes: true,
+        },
+      }),
+    ]);
+
+    return terminals.map((terminal) => {
+      const terminalPackageEvents = packageEvents.filter(
+        (event) => event.terminalId === terminal.id,
+      );
+      const terminalStops = tripStops.filter(
+        (stop) => stop.terminalId === terminal.id,
+      );
+      const arrivals = terminalStops.filter(
+        (stop) => this.dateIsInRange(stop.actualArrival, filters),
+      );
+      const departures = terminalStops.filter(
+        (stop) => this.dateIsInRange(stop.actualDeparture, filters),
+      );
+      const onTimeArrivals = arrivals.filter(
+        (stop) =>
+          this.delayMinutes(stop.plannedArrival, stop.actualArrival!) === 0,
+      ).length;
+      const committedDeliveries = terminalPackageEvents.flatMap((event) => {
+        if (event.eventType !== PackageEventType.PACKAGE_DELIVERED) return [];
+        const estimatedDeliveryAt =
+          event.package.shipmentPackages[0]?.shipment.estimatedDeliveryAt;
+        return estimatedDeliveryAt
+          ? [{ deliveredAt: event.createdAt, estimatedDeliveryAt }]
+          : [];
+      });
+      const onTimeDeliveries = committedDeliveries.filter(
+        (delivery) => delivery.deliveredAt <= delivery.estimatedDeliveryAt,
+      ).length;
+
+      return {
+        id: terminal.id,
+        terminalCode: terminal.terminalCode,
+        name: terminal.name,
+        city: terminal.city,
+        province: terminal.province,
+        currentStatus: terminal.snapshot?.currentStatus ?? null,
+        inventory: {
+          packages: terminal.snapshot?.packageCount ?? 0,
+          containers: terminal.snapshot?.containerCount ?? 0,
+          trailers: terminal.snapshot?.trailerCount ?? 0,
+          employees: terminal.snapshot?.employeeCount ?? 0,
+        },
+        metrics: {
+          packagesProcessed: new Set(
+            terminalPackageEvents.map((event) => event.packageId),
+          ).size,
+          deliveredPackages: terminalPackageEvents.filter(
+            (event) => event.eventType === PackageEventType.PACKAGE_DELIVERED,
+          ).length,
+          committedDeliveries: committedDeliveries.length,
+          onTimeDeliveries,
+          deliveryOnTimePerformance:
+            committedDeliveries.length === 0
+              ? null
+              : Math.round(
+                  (onTimeDeliveries / committedDeliveries.length) * 100,
+                ),
+          lateDeliveries: committedDeliveries.length - onTimeDeliveries,
+          deliveryAttempts: terminalPackageEvents.filter(
+            (event) =>
+              event.eventType === PackageEventType.PACKAGE_ATTEMPTED_DELIVERY,
+          ).length,
+          totalArrivals: arrivals.length,
+          onTimeArrivals,
+          onTimePerformance:
+            arrivals.length === 0
+              ? null
+              : Math.round((onTimeArrivals / arrivals.length) * 100),
+          lateArrivals: arrivals.length - onTimeArrivals,
+          inboundTrailers: arrivals.length,
+          outboundTrailers: departures.length,
+        },
+      };
+    });
+  }
+
+  async getEmployees(terminalId: number) {
+    await this.getTerminal(terminalId);
+    return this.prisma.userSnapshot.findMany({
+      where: { currentTerminalId: terminalId },
+      select: {
+        id: true,
+        employeeNumber: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        currentStatus: true,
+        roleNames: true,
+        lastActivityAt: true,
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    });
+  }
+
+  async getMovements(
+    terminalId: number,
+    filters: TerminalPerformanceQueryDto = {},
+  ) {
+    await this.getTerminal(terminalId);
+    const dateRange = this.activityDateRange(filters);
+    const stops = await this.prisma.tripStop.findMany({
+      where: {
+        terminalId,
+        OR: [
+          { actualArrival: dateRange ?? { not: null } },
+          { actualDeparture: dateRange ?? { not: null } },
+        ],
+      },
+      select: {
+        id: true,
+        plannedArrival: true,
+        actualArrival: true,
+        plannedDeparture: true,
+        actualDeparture: true,
+        delayMinutes: true,
+        trip: {
+          select: {
+            id: true,
+            tripNumber: true,
+            equipmentAssignments: {
+              orderBy: { assignedAt: 'desc' },
+              take: 1,
+              select: {
+                trailer: { select: { trailerBarcode: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { plannedArrival: 'desc' },
+    });
+
+    return stops.flatMap((stop) => {
+      const trailerBarcode =
+        stop.trip.equipmentAssignments[0]?.trailer?.trailerBarcode ?? null;
+      return [
+        ...(this.dateIsInRange(stop.actualArrival, filters)
+          ? [{
+              id: `${stop.id}:inbound`,
+              direction: 'INBOUND' as const,
+              tripId: stop.trip.id,
+              tripNumber: stop.trip.tripNumber,
+              trailerBarcode,
+              plannedAt: stop.plannedArrival,
+              actualAt: stop.actualArrival!,
+              delayMinutes: this.delayMinutes(
+                stop.plannedArrival,
+                stop.actualArrival!,
+              ),
+            }]
+          : []),
+        ...(this.dateIsInRange(stop.actualDeparture, filters)
+          ? [{
+              id: `${stop.id}:outbound`,
+              direction: 'OUTBOUND' as const,
+              tripId: stop.trip.id,
+              tripNumber: stop.trip.tripNumber,
+              trailerBarcode,
+              plannedAt: stop.plannedDeparture,
+              actualAt: stop.actualDeparture!,
+              delayMinutes: this.delayMinutes(
+                stop.plannedDeparture,
+                stop.actualDeparture!,
+              ),
+            }]
+          : []),
+      ];
+    }).sort((left, right) => right.actualAt.getTime() - left.actualAt.getTime());
   }
 
   async getTerminal(terminalId: number) {
@@ -672,6 +891,44 @@ export class TerminalService {
     if (status === TerminalStatus.CLOSED) {
       throw new BadRequestException('Closed terminals cannot process assets');
     }
+  }
+
+  private activityDateRange(
+    filters: Pick<TerminalPerformanceQueryDto, 'fromDate' | 'toDate'>,
+  ): Prisma.DateTimeFilter | undefined {
+    if (filters.fromDate && filters.toDate && filters.fromDate > filters.toDate) {
+      throw new BadRequestException('fromDate must be on or before toDate');
+    }
+    if (!filters.fromDate && !filters.toDate) return undefined;
+    const range: Prisma.DateTimeFilter = {};
+    if (filters.fromDate) {
+      range.gte = new Date(`${filters.fromDate}T00:00:00.000Z`);
+    }
+    if (filters.toDate) {
+      const exclusiveEnd = new Date(`${filters.toDate}T00:00:00.000Z`);
+      exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
+      range.lt = exclusiveEnd;
+    }
+    return range;
+  }
+
+  private dateIsInRange(
+    value: Date | null,
+    filters: Pick<TerminalPerformanceQueryDto, 'fromDate' | 'toDate'>,
+  ) {
+    if (!value) return false;
+    const range = this.activityDateRange(filters);
+    if (!range) return true;
+    const lower = range.gte as Date | undefined;
+    const upper = range.lt as Date | undefined;
+    return (!lower || value >= lower) && (!upper || value < upper);
+  }
+
+  private delayMinutes(planned: Date, actual: Date) {
+    return Math.max(
+      0,
+      Math.round((actual.getTime() - planned.getTime()) / 60_000),
+    );
   }
 
   private normalizeCode(value: string) {

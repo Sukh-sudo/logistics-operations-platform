@@ -26,6 +26,8 @@ describe('TrackingService', () => {
       id: 'internal-id',
       shipmentNumber: 'SHIP-1',
       referenceNumber: 'ORDER-1',
+      transitDays: 2,
+      estimatedDeliveryAt: new Date('2026-07-25T12:00:00Z'),
       notificationRecipient: 'private@example.com',
       originTerminal: terminal,
       destinationTerminal: { ...terminal, terminalCode: 'YYC' },
@@ -74,6 +76,8 @@ describe('TrackingService', () => {
       expect.objectContaining({ where: { shipmentNumber: 'SHIP-1' } }),
     );
     expect(result.status).toBe(ShipmentStatus.IN_TRANSIT);
+    expect(result.transitDays).toBe(2);
+    expect(result.estimatedDeliveryAt).toEqual(new Date('2026-07-25T12:00:00Z'));
     expect(result.progress.outForDeliveryPackages).toBe(1);
     expect(result.packages).toEqual([
       expect.objectContaining({

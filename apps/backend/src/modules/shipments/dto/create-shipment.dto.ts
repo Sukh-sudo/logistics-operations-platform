@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, ArrayUnique, IsArray, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class CreateShipmentDto {
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(40)
@@ -17,6 +17,14 @@ export class CreateShipmentDto {
   originTerminalId: number;
   @ApiProperty() @IsInt() @Min(1)
   destinationTerminalId: number;
+  @ApiProperty({
+    example: 2,
+    description: 'Committed transit time in 24-hour days from shipment creation',
+  })
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  transitDays: number;
   @ApiProperty({ type: [String] }) @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsString({ each: true }) @IsNotEmpty({ each: true })
   packageTrackingNumbers: string[];
 }

@@ -137,6 +137,12 @@ function TrackingResult({
           <h3 className="mt-1 text-2xl font-semibold text-slate-900">
             {tracking.shipmentNumber}
           </h3>
+          <p className="mt-2 text-sm font-medium text-brand-700">
+            Estimated delivery: {timestamp(tracking.estimatedDeliveryAt)}
+            {tracking.transitDays
+              ? ` · ${tracking.transitDays} transit day${tracking.transitDays === 1 ? '' : 's'}`
+              : ''}
+          </p>
         </div>
         <StatusBadge value={tracking.status} />
       </div>

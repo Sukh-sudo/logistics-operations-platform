@@ -15,6 +15,8 @@ const response = {
   shipmentNumber: 'SHIP-100',
   referenceNumber: 'ORDER-100',
   status: 'IN_TRANSIT',
+  transitDays: 2,
+  estimatedDeliveryAt: '2026-07-25T12:00:00Z',
   origin: {
     terminalCode: 'YYC',
     name: 'Calgary-000',

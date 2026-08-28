@@ -9,3 +9,5 @@ export interface TerminalDto { id: number; terminalCode: string; name: string; c
 export interface TerminalEventDto { id: string; terminalId: number; eventType: string; employeeId: number | null; correlationId: string; payload?: unknown; createdAt: string; }
 export interface TerminalInventoryDto { terminalId: number; terminalCode: string; snapshot: TerminalSnapshotDto | null; packages: PackageSnapshotDto[]; containers: ContainerSnapshotDto[]; trailers: TrailerSnapshotDto[]; }
 export interface TerminalOperationsDto { terminalId: number; terminalCode: string; status: string | null; activeTripCount: number; employeeCount: number; lastActivityAt: string | null; recentEvents: TerminalEventDto[]; }
+export interface TerminalEmployeeDto { id: string; employeeNumber: string; email: string; firstName: string; lastName: string; currentStatus: string; roleNames: string[]; lastActivityAt: string | null; }
+export interface TerminalMovementDto { id: string; direction: 'INBOUND' | 'OUTBOUND'; tripId: string; tripNumber: string; trailerBarcode: string | null; plannedAt: string; actualAt: string; delayMinutes: number; }

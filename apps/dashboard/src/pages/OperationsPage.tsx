@@ -49,7 +49,7 @@ export function OperationsPage() {
   const [tripForm, setTripForm] = useState({ tripId: '', action: 'START' as 'START' | 'ARRIVE' | 'DEPART' | 'COMPLETE' | 'CANCEL', stopId: '', notes: '' });
   const [fleetForm, setFleetForm] = useState({ action: 'ASSIGN' as 'ASSIGN' | 'RELEASE', assignmentId: '', tripId: '', truckId: '', driverId: '', trailerId: '' });
   const [transferForm, setTransferForm] = useState({ originTerminalId: '', destinationTerminalId: '', assetType: 'PACKAGE' as TerminalAssetType, assetIdentifier: '', employeeId: '' });
-  const [shipmentCreate, setShipmentCreate] = useState({ shipmentNumber: '', referenceNumber: '', notificationRecipient: '', originTerminalId: '', destinationTerminalId: '', packageTrackingNumbers: '' });
+  const [shipmentCreate, setShipmentCreate] = useState({ shipmentNumber: '', referenceNumber: '', notificationRecipient: '', originTerminalId: '', destinationTerminalId: '', transitDays: '1', packageTrackingNumbers: '' });
   const [shipmentAction, setShipmentAction] = useState({ shipmentId: '', action: 'ASSIGN_PACKAGE' as 'UPDATE_REFERENCE' | 'ASSIGN_PACKAGE' | 'REMOVE_PACKAGE' | 'COMPLETE' | 'CANCEL', value: '' });
 
   const perform = async (name: string, action: () => Promise<unknown>, success: (result: unknown) => string = () => `${name} completed.`) => {
@@ -148,6 +148,7 @@ export function OperationsPage() {
       shipmentNumber: shipmentCreate.shipmentNumber.trim(),
       originTerminalId: Number(shipmentCreate.originTerminalId),
       destinationTerminalId: Number(shipmentCreate.destinationTerminalId),
+      transitDays: Number(shipmentCreate.transitDays),
       packageTrackingNumbers,
       ...(shipmentCreate.referenceNumber.trim() ? { referenceNumber: shipmentCreate.referenceNumber.trim() } : {}),
       ...(shipmentCreate.notificationRecipient.trim() ? { notificationRecipient: shipmentCreate.notificationRecipient.trim() } : {}),
@@ -257,6 +258,7 @@ export function OperationsPage() {
           <Field label="Reference number (optional)"><input aria-label="New shipment reference" value={shipmentCreate.referenceNumber} onChange={event => setShipmentCreate(current => ({ ...current, referenceNumber: event.target.value }))} className={inputClass}/></Field>
           <TerminalSelect label="Shipment origin" value={shipmentCreate.originTerminalId} onChange={value => setShipmentCreate(current => ({ ...current, originTerminalId: value }))} terminals={terminals}/>
           <TerminalSelect label="Shipment destination" value={shipmentCreate.destinationTerminalId} onChange={value => setShipmentCreate(current => ({ ...current, destinationTerminalId: value }))} terminals={terminals}/>
+          <Field label="Transit days"><input aria-label="Shipment transit days" type="number" required min="1" max="365" value={shipmentCreate.transitDays} onChange={event => setShipmentCreate(current => ({ ...current, transitDays: event.target.value }))} className={inputClass}/></Field>
           <Field label="Notification email (optional)"><input aria-label="Shipment notification email" type="email" value={shipmentCreate.notificationRecipient} onChange={event => setShipmentCreate(current => ({ ...current, notificationRecipient: event.target.value }))} className={inputClass}/></Field>
           <Field label="Package numbers (comma or space separated)"><textarea aria-label="Shipment package numbers" required rows={3} value={shipmentCreate.packageTrackingNumbers} onChange={event => setShipmentCreate(current => ({ ...current, packageTrackingNumbers: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"/></Field>
           <div className="sm:col-span-2"><SubmitButton busy={busy}>Create shipment</SubmitButton></div>

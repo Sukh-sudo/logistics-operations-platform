@@ -29,15 +29,21 @@ export class ShipmentService {
       const packages = await this.findPackages(tx, dto.packageTrackingNumbers);
       const assigned = await tx.shipmentPackage.findMany({ where: { packageId: { in: packages.map((item) => item.id) } } });
       if (assigned.length) throw new ConflictException('One or more packages already belong to a shipment');
-      const shipment = await tx.shipment.create({ data: { shipmentNumber, referenceNumber: dto.referenceNumber?.trim(), notificationRecipient: dto.notificationRecipient?.trim().toLowerCase(), originTerminalId: dto.originTerminalId, destinationTerminalId: dto.destinationTerminalId, status: ShipmentStatus.PACKAGES_ASSIGNED } });
+      const draftShipment = await tx.shipment.create({ data: { shipmentNumber, referenceNumber: dto.referenceNumber?.trim(), notificationRecipient: dto.notificationRecipient?.trim().toLowerCase(), originTerminalId: dto.originTerminalId, destinationTerminalId: dto.destinationTerminalId, transitDays: dto.transitDays, status: ShipmentStatus.PACKAGES_ASSIGNED } });
+      const estimatedDeliveryAt = this.addDays(draftShipment.createdAt, dto.transitDays);
+      const shipment = await tx.shipment.update({ where: { id: draftShipment.id }, data: { estimatedDeliveryAt } });
       await tx.shipmentPackage.createMany({ data: packages.map((item) => ({ shipmentId: shipment.id, packageId: item.id })) });
-      const event = await tx.shipmentEvent.create({ data: { shipmentId: shipment.id, eventType: ShipmentEventType.SHIPMENT_CREATED, correlationId, payload: { shipmentNumber, originTerminalId: dto.originTerminalId, destinationTerminalId: dto.destinationTerminalId, packageTrackingNumbers: dto.packageTrackingNumbers } } });
+      const event = await tx.shipmentEvent.create({ data: { shipmentId: shipment.id, eventType: ShipmentEventType.SHIPMENT_CREATED, correlationId, payload: { shipmentNumber, originTerminalId: dto.originTerminalId, destinationTerminalId: dto.destinationTerminalId, transitDays: dto.transitDays, estimatedDeliveryAt: estimatedDeliveryAt.toISOString(), packageTrackingNumbers: dto.packageTrackingNumbers } } });
       const progress = this.progress(packages);
       const snapshot = await tx.shipmentSnapshot.create({ data: { shipmentId: shipment.id, currentStatus: ShipmentStatus.PACKAGES_ASSIGNED, currentTerminalId: dto.originTerminalId, ...progress, lastActivityAt: event.createdAt } });
       return { shipment, packages, event, snapshot };
     });
     await this.dispatchNotification(result);
     return result;
+  }
+
+  private addDays(value: Date, days: number) {
+    return new Date(value.getTime() + days * 24 * 60 * 60 * 1000);
   }
 
   getShipments() {
