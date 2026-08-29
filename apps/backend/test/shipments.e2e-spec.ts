@@ -24,7 +24,7 @@ describe('Shipments (e2e)', () => {
 
   it('manages package membership and completes only after delivery', async () => {
     const originTerminalId = await terminal(); const destinationTerminalId = await terminal(); const first = await pkg(originTerminalId); const second = await pkg(originTerminalId);
-    const created = await request(app.getHttpServer()).post('/shipments').send({ shipmentNumber: unique('SHIP'), referenceNumber: 'ORDER-1', originTerminalId, destinationTerminalId, packageTrackingNumbers: [first] }).expect(201);
+    const created = await request(app.getHttpServer()).post('/shipments').send({ shipmentNumber: unique('SHIP'), referenceNumber: 'ORDER-1', originTerminalId, destinationTerminalId, transitDays: 2, packageTrackingNumbers: [first] }).expect(201);
     const id = created.body.shipment.id;
     expect(created.body.event.eventType).toBe('SHIPMENT_CREATED'); expect(created.body.snapshot.packageCount).toBe(1);
     const assigned = await request(app.getHttpServer()).post(`/shipments/${id}/assign-package`).send({ trackingNumber: second }).expect(201);

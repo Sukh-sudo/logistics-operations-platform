@@ -88,6 +88,7 @@ describe('Trips (e2e)', () => {
         shipmentNumber: unique('TRIP-SHIP'),
         originTerminalId,
         destinationTerminalId,
+        transitDays: 2,
         packageTrackingNumbers: [trackingNumber],
       })
       .expect(201);

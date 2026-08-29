@@ -76,6 +76,7 @@ describe('Phase 4 customer features (e2e)', () => {
         notificationRecipient: recipient,
         originTerminalId,
         destinationTerminalId,
+        transitDays: 2,
         packageTrackingNumbers: [trackingNumber],
       })
       .expect(201);
